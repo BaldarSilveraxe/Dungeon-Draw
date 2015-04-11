@@ -5,6 +5,8 @@ var DungeonDraw = DungeonDraw || (function(){
     "The Aaron" teaching me to be a Bit Wiser
     And anyone that buys my packs!
     ------------------- */
+    
+    //Command: !DungeonDrawMenu
  
     var version = 0.1,
         lastUpdate = 1428220800, //Unix timestamp
