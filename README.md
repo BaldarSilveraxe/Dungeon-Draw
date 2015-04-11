@@ -8,5 +8,7 @@ https://www.dropbox.com/sh/82osy9xgpwbnwrp/AAAEEsv3fvG7mPDAAhvvJV3_a?dl=0
 Helpful table to refernce so you don't go too crazy setting up the tiles.
 https://docs.google.com/spreadsheets/d/1zn5VdRAQIz7HQGRR9heTYJzg-V8lnKNARzP_JqJICLQ/edit?usp=sharing
 
+Command is: !DungeonDrawMenu
+
 
 
