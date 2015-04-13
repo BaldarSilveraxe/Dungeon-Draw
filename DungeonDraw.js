@@ -8,11 +8,9 @@ var DungeonDraw = DungeonDraw || (function(){
     
     //Command: !DungeonDrawMenu
  
-    var version = 0.1,
-        lastUpdate = 1428220800, //Unix timestamp
+    var version = 0.2,
+        lastUpdate = 1428930444, //Unix timestamp
         schemaVersion = 0.2,
-        
-        toggleIcon = 'https://s3.amazonaws.com/files.d20.io/images/8434850/ijzdctgdJpFj_Q2NC9GFvg/thumb.png?1427221316',
         
         undo = [],
         
@@ -32,30 +30,12 @@ var DungeonDraw = DungeonDraw || (function(){
         cellDivStyle = ' style="display: table-cell; border-collapse: collapse; padding-left: 0px; padding-right: 0px;"',
         atagOneStyle = ' style="border: 1px solid AliceBlue; background-color: SteelBlue; color: white;"',
         atagTwoStyle = ' style="border: 1px solid Black; background-color: White; color: white;"',
+        atagThrStyle = ' style="border: 1px solid DarkGray; background-color: DarkGray; color: white;"',
+        atagForStyle = ' style="border: 1px solid Black; background-color: PaleGreen; color: Black;"',
         imagDivStyle = ' style="padding: 0px 0px 0px 0px; outline: none; border: none;"',
-        spanOneStyle = ' style="color:white; font-weight:normal; display:block; width: 150px;"',
+        spanOneStyle = ' style="color: white; font-weight: normal; display: block; width: 150px;"',
+        spanForStyle = ' style="color: Black; font-weight: normal; display: block; width: 150px;"',
         
-    dungeonDrawSetTexture = function(message) {
-        var pack = message.replace('!DungeonDrawSetTexture ', ''),
-            switchPack = defaultTexture,
-            args;
-        
-        _.each(installedTextures, function(eachTextures) {
-            args = eachTextures.split('|');
-            if( args[0] === pack ) {switchPack = eachTextures; } 
-        });
-        
-        state.DungeonDraw = {
-                version: schemaVersion,
-                currentTextureName: switchPack,
-                drawMode: true
-            };
-            
-        currentTiles = _.clone(DungeonDrawTiles[state.DungeonDraw.currentTextureName]);
-        
-        dungeonDrawMenu();
-    },
-    
     dungeonDrawChange = function() {
         var text = '/direct ',
             args;
@@ -64,7 +44,7 @@ var DungeonDraw = DungeonDraw || (function(){
         
         _.each(installedTextures, function(eachTextures) {
             args = eachTextures.split('|');
-            if( 2 !== args.length){return };
+            if( 2 !== args.length){return; }
         });
         _.each(installedTextures, function(eachTextures) {
             args = eachTextures.split('|');
@@ -91,7 +71,7 @@ var DungeonDraw = DungeonDraw || (function(){
             
         thisTile = _.where(currentTiles, {key: key});
         if( _.isEmpty(thisTile) ) {return; }
-        
+
         pageId = Campaign().get('playerpageid');
         page = getObj('page', pageId);
         center = Math.floor(page.get('width') / 2) * 70;
@@ -112,8 +92,20 @@ var DungeonDraw = DungeonDraw || (function(){
     },
     
     dungeonDrawMenu = function() {
-        var i = 0, 
-        tableText = '';
+        var i = 0,
+        mode,
+        tableText = '',
+        tag, span;
+        
+        if( false === state.DungeonDraw.drawMode ){
+            mode = '◯-Draw-Is-<b>OFF</b>';
+            tag = atagThrStyle;
+            span = spanOneStyle;
+        }else{
+            mode = '◯-Draw-Is-<b>ON</b>';
+            tag = atagForStyle;
+            span = spanForStyle;
+        }
         
         sendChat('Dungeon Draw Tools', ' ');
         tableText += '<div' + tablDivStyle + '>';
@@ -154,9 +146,30 @@ var DungeonDraw = DungeonDraw || (function(){
             +'<br><a href="!DungeonDrawMap"' + atagOneStyle + '><span ' + spanOneStyle + '>╔╣-Dungeon-Draw</span></a>'
             +'<br><a href="!DungeonDrawClear ?{Are You Sure|Y}"' + atagOneStyle + '><span ' + spanOneStyle + '>⊠-Clear-Map</span></a>'
             +'<br><a href="!DungeonDrawColor"' + atagOneStyle + '><span ' + spanOneStyle + '>▓-Set-Map-Color</span></a>'
-            +'<br><a href="!DungeonDrawReady"' + atagOneStyle + '><span ' + spanOneStyle + '>⇕-Ready-Door-Torches</span></a>'
             +'<br><a href="!DungeonDrawChange"' + atagOneStyle + '><span ' + spanOneStyle + '>⊞-Change-Texture</span></a>'
+            +'<br><a href="!DungeonDrawMode"' + tag + '><span ' + span + '>' + mode + '</span></a>'
             );
+    },
+    
+    dungeonDrawSetTexture = function(message) {
+        var pack = message.replace('!DungeonDrawSetTexture ', ''),
+            switchPack = defaultTexture,
+            args;
+        
+        _.each(installedTextures, function(eachTextures) {
+            args = eachTextures.split('|');
+            if( args[0] === pack ) {switchPack = eachTextures; } 
+        });
+        
+        state.DungeonDraw = {
+                version: schemaVersion,
+                currentTextureName: switchPack,
+                drawMode: true
+            };
+            
+        currentTiles = _.clone(DungeonDrawTiles[state.DungeonDraw.currentTextureName]);
+        
+        dungeonDrawMenu();
     },
     
     clearMap = function(y) {
@@ -182,53 +195,6 @@ var DungeonDraw = DungeonDraw || (function(){
         undo = [];
     },
     
-    macrosInstall = function() {
-        var controllerName = 'Door-And-Torch-Control',
-            controllerSheet = findObjs({ _type: 'character', name: controllerName}), 
-            controllerAbility;
-        if ( 0 === controllerSheet.length ) { 
-            createObj('character', {name: controllerName, avatar: toggleIcon}); 
-        }
-        controllerAbility = findObjs({ 
-            _type: 'ability', 
-            name: '⇕-Toggle-Feature', 
-            characterid: findObjs({ _type: 'character', name: controllerName})[0].get('_id'),
-        });
-        if ( 0 === controllerAbility.length ) { 
-            createObj('ability', {
-                name: '⇕-Toggle-Feature', 
-                characterid: findObjs({ _type: 'character', name: controllerName})[0].get('_id'),
-                action: '!DungeonMapperDoorsToggle',
-                istokenaction: true
-            }); 
-        }
-    },
-    
-    doorInitial = function(name,id){
-        var findPaths;
-        
-        switch(name) {
-            case 'DD_017':
-            case 'DD_019':
-                findPaths = findObjs({_type: 'path', controlledby: id});
-                _.each(findPaths, function(path) {
-                    if( '#FFFF00' === path.get('stroke') ){
-                       path.set('layer', 'gmlayer');
-                    }
-                });
-            break;
-            case 'DD_018':
-            case 'DD_020':
-                findPaths = findObjs({_type: 'path', controlledby: id});
-                _.each(findPaths, function(path) {
-                    if( '#00FF00' === path.get('stroke') ){
-                       path.set('layer', 'gmlayer');
-                    }
-                });
-            break;
-        }
-    },
-    
     checkSelect = function(obj) {
         var token;
         
@@ -239,118 +205,6 @@ var DungeonDraw = DungeonDraw || (function(){
         
         if ('objects' !== token.get('layer')) {return false; }
         return true;
-    },
-    
-    dungeonMapperDoorsToggle = function(message) {
-        var selected = _.first(message.selected),
-            objCheck = checkSelect(selected),
-            token,
-            name,
-            id,
-            findPaths,
-            a, b;
-            
-        if ( false === objCheck ) {return; }    
-        token = getObj('graphic', selected._id);
-        name = token.get('name');
-        id = token.get('id');
-        
-        switch(name) {
-            case 'DD_017':
-            case 'DD_018':
-                a = _.where(currentTiles, {key: 'DD_017'})[0].url;
-                b = _.where(currentTiles, {key: 'DD_018'})[0].url;
-                token.set('imgsrc', (token.get('imgsrc') === a ? b : a));
-                token.set('name', (token.get('imgsrc') === a ? 'DD_017' : 'DD_018'));
-                break;
-            case 'DD_019':
-            case 'DD_020':
-                a = _.where(currentTiles, {key: 'DD_019'})[0].url;
-                b = _.where(currentTiles, {key: 'DD_020'})[0].url;
-                token.set('imgsrc', (token.get('imgsrc') === a ? b : a));
-                token.set('name', (token.get('imgsrc') === a ? 'DD_019' : 'DD_020'));
-                break;    
-            case 'DD_021':
-            case 'DD_022':
-                a = _.where(currentTiles, {key: 'DD_021'})[0].url;
-                b = _.where(currentTiles, {key: 'DD_022'})[0].url;
-                token.set('imgsrc', (token.get('imgsrc') === a ? b : a));
-                token.set('light_radius', (token.get('imgsrc') === a ? 40 : 0));
-                token.set('name', (token.get('imgsrc') === a ? 'DD_021' : 'DD_022'));
-                break;   
-            case 'DD_023':
-            case 'DD_024':
-                a = _.where(currentTiles, {key: 'DD_023'})[0].url;
-                b = _.where(currentTiles, {key: 'DD_024'})[0].url;
-                token.set('imgsrc', (token.get('imgsrc') === a ? b : a));
-                token.set('light_radius', (token.get('imgsrc') === a ? 40 : 0));
-                token.set('name', (token.get('imgsrc') === a ? 'DD_023' : 'DD_024'));
-                break;
-            case 'DD_027':
-            case 'DD_028':
-                a = _.where(currentTiles, {key: 'DD_027'})[0].url;
-                b = _.where(currentTiles, {key: 'DD_028'})[0].url;
-                token.set('imgsrc', (token.get('imgsrc') === a ? b : a));
-                token.set('name', (token.get('imgsrc') === a ? 'DD_027' : 'DD_028'));
-                break;
-        }
-        
-        
-        switch(name) {
-            case 'DD_017':
-            case 'DD_019':
-                findPaths = findObjs({_type: 'path', controlledby: id});
-                _.each(findPaths, function(path) {
-                    if( '#FFFF00' === path.get('stroke') ){
-                       path.set('layer', 'walls');
-                    }
-                    if( '#00FF00' === path.get('stroke') ){
-                       path.set('layer', 'gmlayer');
-                    }
-                });
-            break; 
-            case 'DD_018':
-            case 'DD_020':
-                findPaths = findObjs({_type: 'path', controlledby: id});
-                _.each(findPaths, function(path) {
-                    if( '#FFFF00' === path.get('stroke') ){
-                       path.set('layer', 'gmlayer');
-                    }
-                    if( '#00FF00' === path.get('stroke') ){
-                       path.set('layer', 'walls');
-                    }
-                });
-            break; 
-        }
-        
-    },
-    
-    dungeonDrawReady = function() {
-        var allObjectImages = findObjs({ _type: 'graphic', layer: 'objects', pageid: Campaign().get('playerpageid')}),
-            controllerName = 'Door-And-Torch-Control', name;
-        
-        _.each(allObjectImages, function(obj) {
-            name = obj.get('name');
-            switch(name) {
-                case 'DD_021':
-                case 'DD_022':
-                case 'DD_023':
-                case 'DD_024':
-                case 'DD_028':
-                case 'DD_027':
-                    macrosInstall();
-                    obj.set('represents', findObjs({ _type: 'character', name: controllerName})[0].get('_id'));
-                break;
-                case 'DD_017':
-                case 'DD_018':
-                case 'DD_019':
-                case 'DD_020':
-                    macrosInstall();
-                    obj.set('represents', findObjs({ _type: 'character', name: controllerName})[0].get('_id'));
-                    doorInitial(name,obj.get('id'));
-                break;
-            }
-        });
     },
     
     pathingRotation = function(angle, point,width,height) {
@@ -406,7 +260,7 @@ var DungeonDraw = DungeonDraw || (function(){
             }
             pathString = "";
             for(i = 0; i < PathArray.length; i++) {
-                if(i != 0) {
+                if(i !== 0) {
                     pathString += ",[\"L\"," + PathArray[i][0] + "," + PathArray[i][1] + "]";
                 } else {
                     pathString = "[\[\"M\"," + PathArray[i][0] + "," + PathArray[i][1] + "]";  
@@ -463,8 +317,7 @@ var DungeonDraw = DungeonDraw || (function(){
             newMask,
             maskedMapSquare,
             i,
-            foundTiles,
-            foundTile;
+            foundTiles;
             
         _.each(currentTiles, function(eachTile) {
             if( 0 !== eachTile.value ){
@@ -624,7 +477,7 @@ var DungeonDraw = DungeonDraw || (function(){
                 pageHeight: pageHeight
                 });
         });
-        sortedPaths = _.sortBy(sortedPaths, 'area')
+        sortedPaths = _.sortBy(sortedPaths, 'area');
         sortedPaths.reverse();
         _.each(sortedPaths, function(eachPath) {
             findFill(eachPath);
@@ -644,7 +497,6 @@ var DungeonDraw = DungeonDraw || (function(){
     },
 
     checkInstall = function() {
-        macrosInstall();
         Object.keys(DungeonDrawTiles).forEach(function(key) {
             installedTextures.push(key);
         });
@@ -661,10 +513,20 @@ var DungeonDraw = DungeonDraw || (function(){
     },
     
     handleGraphicDestroy = function(obj) {
-        var locatedPaths = findObjs({                                                          
-            _type: 'path',
-            controlledby: obj.get('_id')
-        });
+        var foundTiles,
+            locatedPaths = findObjs({                                                          
+                _type: 'path',
+                controlledby: obj.get('_id')
+            });
+        
+        foundTiles = _.where(currentTiles, {key: obj.get('name')});
+        if( 0 === foundTiles.length) {
+            return;
+        }
+        if ( (255 === foundTiles[0].value) && (0 === foundTiles[0].mask) ){
+            return;
+        }
+        
         _.each(locatedPaths, function(eachPath) {
             if (eachPath.length !== 0) { 
                 eachPath.remove();
@@ -672,224 +534,34 @@ var DungeonDraw = DungeonDraw || (function(){
         });
     },
     
-    specialTiles = function(obj) {
-        var name = obj.get('name'),
-            foundTiles,
-            value,
-            pageId = obj.get('_pageid'),
-            rotation = obj.get('rotation'),
-            tileLeft = obj.get('left'),
-            tileTop = obj.get('top'),
-            tileVflip = obj.get('flipv'),
-            tileHflip = obj.get('fliph'),
-            tileId = obj.get('_id'),
-            featurePathArray,
-            locatedPaths;
-            
-        featurePathArray = [];
-        switch(name) {
-                    case 'DD_025':
-                    case 'DD_026':
-                        obj.set({
-                            width: 140,
-                            height: 140,
-                        });
-                        featurePathArray.push({
-                            width: 140,
-                            height: 140,
-                            top: tileTop,
-                            left: tileLeft,
-                            rotation: rotation,
-                            fliph: tileHflip,
-                            flipv: tileVflip,
-                            path: [[0,141],[0,0],[140,0],[140,141]],
-                            stroke: '#FFFF00',
-                            strokewidth: 3,
-                            forID: tileId
-                        });
-                    break;
-                    case 'DD_027':
-                    case 'DD_028':
-                        obj.set({
-                            width: 140,
-                            height: 140,
-                            layer: 'objects',
-                        });
-                    break;
-                    case 'DD_021':
-                    case 'DD_023':
-                        obj.set({
-                            width: 140,
-                            height: 140,
-                            light_radius: 60,
-                            light_dimradius: 20,
-                            light_otherplayers: true,
-                            layer: 'objects'
-                        });
-                    break;
-                    case 'DD_022':
-                    case 'DD_024':
-                        obj.set({
-                            width: 140,
-                            height: 140,
-                            light_radius: 0,
-                            light_dimradius: 20,
-                            light_otherplayers: true,
-                            layer: 'objects'
-                        });
-                    break;
-                    case 'DD_017':
-                    case 'DD_018':
-                        obj.set({
-                            width: 140,
-                            height: 140,
-                            layer: 'objects'
-                        });
-                        //Door Wall
-                        featurePathArray.push({
-                            width: 140,
-                            height: 140,
-                            top: tileTop,
-                            left: tileLeft,
-                            rotation: rotation,
-                            fliph: tileHflip,
-                            flipv: tileVflip,
-                            path: [[60,65],[141,65],[141,70]],
-                            stroke: '#FF0000',
-                            strokewidth: 3,
-                            forID: tileId
-                        });
-                        //Door Open
-                        featurePathArray.push({
-                            width: 140,
-                            height: 140,
-                            top: tileTop,
-                            left: tileLeft,
-                            rotation: rotation,
-                            fliph: tileHflip,
-                            flipv: tileVflip,
-                            path: [[60,65],[55,70],[60,120]],
-                            stroke: '#00FF00',
-                            strokewidth: 3,
-                            forID: tileId
-                        });
-                        //DoorClosed
-                        featurePathArray.push({
-                            width: 140,
-                            height: 140,
-                            top: tileTop,
-                            left: tileLeft,
-                            rotation: rotation,
-                            fliph: tileHflip,
-                            flipv: tileVflip,
-                            path: [[0,70],[0,65],[60,65]],
-                            stroke: '#FFFF00',
-                            strokewidth: 3,
-                            forID: tileId
-                        });       
-                    break;
-                    case 'DD_019':
-                    case 'DD_020':
-                        obj.set({
-                            width: 140,
-                            height: 140,
-                            layer: 'objects'
-                        });
-                        //DoorClosed_Double
-                        featurePathArray.push({
-                            width: 140,
-                            height: 140,
-                            top: tileTop,
-                            left: tileLeft,
-                            rotation: rotation,
-                            fliph: tileHflip,
-                            flipv: tileVflip,
-                            path: [[0,70],[0,65],[140,65],[140,70]],
-                            stroke: '#FFFF00',
-                            strokewidth: 3,
-                            forID: tileId
-                        });
-                        //DoorClosed_Single
-                        featurePathArray.push({
-                            width: 140,
-                            height: 140,
-                            top: tileTop,
-                            left: tileLeft,
-                            rotation: rotation,
-                            fliph: tileHflip,
-                            flipv: tileVflip,
-                            path: [[0,70],[0,65],[15,65],[25,128]],
-                            stroke: '#00FF00',
-                            strokewidth: 3,
-                            forID: tileId
-                        });
-                        featurePathArray.push({
-                            width: 140,
-                            height: 140,
-                            top: tileTop,
-                            left: tileLeft,
-                            rotation: rotation,
-                            fliph: tileHflip,
-                            flipv: tileVflip,
-                            path: [[140,70],[140,65],[125,65],[115,128]],
-                            stroke: '#00FF00',
-                            strokewidth: 3,
-                            forID: tileId
-                        });
-                    break;
-        }
-        if(_.isEmpty(featurePathArray)){
-            return;
-        }
-        locatedPaths = findObjs({                                                          
-            _type: 'path',
-            controlledby: tileId
-        });
-        _.each(locatedPaths, function(eachPath) {
-            if (eachPath.length !== 0) { 
-                eachPath.remove();
-            }
-        });
-        placeRotatedFlipPaths(featurePathArray);
-        toFront(obj);
-    },
-
     handleGraphicChange = function(obj) {
-        var name = obj.get('name'),
+        var ObjValues,
             foundTiles,
-            value,
-            pageId,
-            rotation, 
-            tileLeft, 
-            tileTop, 
-            tileVflip, 
-            tileHflip,
-            tileId,
+            value, 
             bitCount,
             featurePathArray,
-            locatedPaths;
+            locatedPaths,
+            pathValue;
+            
+        ObjValues = _.reduce(['name','pageid','rotation','left','top','flipv','fliph','id'],function(m,prop){
+            m[prop] = obj.get(prop);
+            return m;
+        }, {});
         
-        foundTiles = _.where(currentTiles, {key: name});
+        
+        foundTiles = _.where(currentTiles, {key: ObjValues.name});
         if( 0 === foundTiles.length) {
             return;
         }
         if ( (255 === foundTiles[0].value) && (0 === foundTiles[0].mask) ){
-            specialTiles(obj); 
             return;
         }
-        activePage = obj.get('_pageid'); 
-        value = foundTiles[0].value;
-        pageId = obj.get('_pageid');
-        rotation = obj.get('rotation'); 
-        tileLeft = obj.get('left'); 
-        tileTop = obj.get('top');
-        tileVflip = obj.get('flipv'); 
-        tileHflip = obj.get('fliph');
-        tileId = obj.get('_id');
+        activePage = ObjValues.pageid; 
+        value = foundTiles[0].value; 
         
         locatedPaths = findObjs({                                                          
             _type: 'path',
-            controlledby: tileId
+            controlledby: ObjValues.id
         });
         _.each(locatedPaths, function(eachPath) {
             if (eachPath.length !== 0) { 
@@ -902,125 +574,44 @@ var DungeonDraw = DungeonDraw || (function(){
             if (!(value & (1<<bitCount))) {
                 switch(bitCount + 1) {
                     case 1:
-                        featurePathArray.push({
-                            width: 70,
-                            height: 70,
-                            top: tileTop,
-                            left: tileLeft,
-                            rotation: rotation,
-                            fliph: tileHflip,
-                            flipv: tileVflip,
-                            path: [[0,-1],[0,71]],
-                            stroke: '#FF0000',
-                            strokewidth: 3,
-                            forID: tileId
-                        });
+                        pathValue = [[0,-1],[0,71]];
                     break;
                     case 2:
-                        featurePathArray.push({
-                            width: 70,
-                            height: 70,
-                            top: tileTop,
-                            left: tileLeft,
-                            rotation: rotation,
-                            fliph: tileHflip,
-                            flipv: tileVflip,
-                            path: [[0,68],[0,70],[2,70]],
-                            stroke: '#FF0000',
-                            strokewidth: 3,
-                            forID: tileId
-                        });
+                        pathValue = [[0,68],[0,70],[2,70]];
                     break;
                     case 3:
-                        featurePathArray.push({
-                            width: 70,
-                            height: 70,
-                            top: tileTop,
-                            left: tileLeft,
-                            rotation: rotation,
-                            fliph: tileHflip,
-                            flipv: tileVflip,
-                            path: [[-1,70],[71,70]],
-                            stroke: '#FF0000',
-                            strokewidth: 3,
-                            forID: tileId
-                        });
+                        pathValue = [[-1,70],[71,70]];
                     break;
                     case 4:
-                        featurePathArray.push({
-                            width: 70,
-                            height: 70,
-                            top: tileTop,
-                            left: tileLeft,
-                            rotation: rotation,
-                            fliph: tileHflip,
-                            flipv: tileVflip,
-                            path: [[70,68],[70,70],[68,70]],
-                            stroke: '#FF0000',
-                            strokewidth: 3,
-                            forID: tileId
-                        });
+                        pathValue =  [[70,68],[70,70],[68,70]];
                     break;
                     case 5:
-                        featurePathArray.push({
-                            width: 70,
-                            height: 70,
-                            top: tileTop,
-                            left: tileLeft,
-                            rotation: rotation,
-                            fliph: tileHflip,
-                            flipv: tileVflip,
-                            path: [[70,-1],[70,71]],
-                            stroke: '#FF0000',
-                            strokewidth: 3,
-                            forID: tileId
-                        });
+                        pathValue = [[70,-1],[70,71]];
                     break;
                     case 6:
-                        featurePathArray.push({
-                            width: 70,
-                            height: 70,
-                            top: tileTop,
-                            left: tileLeft,
-                            rotation: rotation,
-                            fliph: tileHflip,
-                            flipv: tileVflip,
-                            path: [[70,2],[70,0],[68,0]],
-                            stroke: '#FF0000',
-                            strokewidth: 3,
-                            forID: tileId
-                        });
+                        pathValue = [[70,2],[70,0],[68,0]];
                     break;
                     case 7:
-                        featurePathArray.push({
-                            width: 70,
-                            height: 70,
-                            top: tileTop,
-                            left: tileLeft,
-                            rotation: rotation,
-                            fliph: tileHflip,
-                            flipv: tileVflip,
-                            path: [[-1,0],[71,0]],
-                            stroke: '#FF0000',
-                            strokewidth: 3,
-                            forID: tileId
-                        });
+                        pathValue = [[-1,0],[71,0]];
                     break;
                     case 8:
-                        featurePathArray.push({
-                            width: 70,
-                            height: 70,
-                            top: tileTop,
-                            left: tileLeft,
-                            rotation: rotation,
-                            fliph: tileHflip,
-                            flipv: tileVflip,
-                            path: [[0,2],[0,0],[2,0]],
-                            stroke: '#FF0000',
-                            strokewidth: 3,
-                            forID: tileId
-                        });
+                        pathValue = [[0,2],[0,0],[2,0]];
                     break;
+                }
+                if(pathValue){
+                    featurePathArray.push({
+                        width: 70,
+                        height: 70,
+                        top: ObjValues.top,
+                        left: ObjValues.left,
+                        rotation: ObjValues.rotation,
+                        fliph: ObjValues.fliph,
+                        flipv: ObjValues.flipv,
+                        path: pathValue,
+                        stroke: '#FF0000',
+                        strokewidth: 3,
+                        forID: ObjValues.id
+                    });
                 }
             }
         }
@@ -1040,37 +631,41 @@ var DungeonDraw = DungeonDraw || (function(){
    
     handlePathAdd = function(obj) {
         if( false === state.DungeonDraw.drawMode ){return; }
-        var top = obj.get('top'), 
-            left = obj.get('left'), 
-            width = obj.get('width'),
-            height = obj.get('height'), 
-            layer = obj.get('layer'), 
-            pageid = obj.get('_pageid'), 
-            stroke = obj.get('stroke'), 
+        var ObjValues,
+            left,
+            top,  
+            width,
+            height,  
             newPath,             
             createdPath;
-        if( 'map' !== layer ){return; }
-        activePage = pageid;
+            
+        ObjValues = _.reduce(['name','layer','pageid','stroke','left','top','width','height','id'],function(m,prop){
+            m[prop] = obj.get(prop);
+            return m;
+        }, {});
+        
+        if( 'map' !== ObjValues.layer ){return; }
+        activePage = ObjValues.id;
         obj.remove(); 
         
-        width = Math.ceil(width/70) * 70;
-        height = Math.ceil(height/70) * 70;
-        top = Math.ceil(top/35) * 35;
+        width = Math.ceil(ObjValues.width/70) * 70;
+        height = Math.ceil(ObjValues.height/70) * 70;
+        top = Math.ceil(ObjValues.top/35) * 35;
         top = getCenter(top, height);
-        left = Math.ceil(left/35) * 35;
+        left = Math.ceil(ObjValues.left/35) * 35;
         left = getCenter(left, width); 
         newPath = '[["M",0,0],["L",' + width + ',0],["L",' + width + ',' + height + '],["L",0,' + height + '],["L",0,0]]';
 
         createdPath = createObj('path',{ 
-            pageid: pageid, 
-            layer: layer, 
+            pageid: ObjValues.pageid, 
+            layer: ObjValues.layer, 
             path: newPath,
             left: left,
             top: top,
             width: width, 
             height: height, 
-            fill: stroke,
-            stroke: stroke,
+            fill: ObjValues.stroke,
+            stroke: ObjValues.stroke,
             stroke_width: 1,
             controlledby: 'DungeonDraw'
         });
@@ -1089,23 +684,55 @@ var DungeonDraw = DungeonDraw || (function(){
     handleInput = function(msg) {
         var message = _.clone(msg), args;
         
-        if ( 'api' !== message.type ) {return; }
+        if ( 'api' !== message.type ) {
+            return; 
+        }
         
         args = msg.content.split(/\s+/);
+        if( args[0] === '!DungeonDrawMenu' ){
+            dungeonDrawMenu(); 
+            return;
+        }
         
-        switch(args[0]) {
-            case '!DungeonDrawMenu': dungeonDrawMenu(); return;
-            case '!DungeonDrawUndo': dungeonDrawUndo(); return;
-            case '!DungeonDrawMap': dungeonDrawMap(); return;
-            case '!DungeonDrawClear': clearMap(args[1]); return;
-            case '!DungeonDrawColor': colorMap(); return;
-            case '!DungeonDrawNumber': dungeonDrawNumber(args[1]); return;
-            case '!DungeonDrawReady': dungeonDrawReady(); return;
-            case '!DungeonMapperDoorsToggle': dungeonMapperDoorsToggle(message); return;
-            case '!DungeonDrawChange': dungeonDrawChange(); return;
-            case '!DungeonDrawSetTexture': dungeonDrawSetTexture(msg.content); return;
+        if ( args[0] === '!DungeonDrawMode') {
+            state.DungeonDraw.drawMode = (state.DungeonDraw.drawMode === true ? false : true);
+            dungeonDrawMenu();
+            return;
+        }
+        
+        if( false === state.DungeonDraw.drawMode ){
+            return; 
+        }
+        
+        switch(args[0]) { 
+            case '!DungeonDrawUndo': 
+                dungeonDrawUndo(); 
+                return;
+                
+            case '!DungeonDrawMap': 
+                dungeonDrawMap(); 
+                return;
+                
+            case '!DungeonDrawClear': 
+                clearMap(args[1]); 
+                return;
+                
+            case '!DungeonDrawColor': 
+                colorMap(); 
+                return;
+                
+            case '!DungeonDrawNumber':
+                dungeonDrawNumber(args[1]); 
+                return;
+                
+            case '!DungeonDrawChange': 
+                dungeonDrawChange(); 
+                return;
+                
+            case '!DungeonDrawSetTexture': 
+                dungeonDrawSetTexture(message.content); 
+                return;
         };
-        return;
     },
  
     registerEventHandlers = function() {
@@ -1120,7 +747,7 @@ var DungeonDraw = DungeonDraw || (function(){
     return {
         CheckInstall: checkInstall,
         RegisterEventHandlers: registerEventHandlers
-	}; 
+    }; 
 }());
 
 on('ready',function(){
