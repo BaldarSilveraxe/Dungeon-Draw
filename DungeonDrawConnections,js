@@ -1,0 +1,456 @@
+var DungeonDrawConnections = DungeonDrawConnections || (function(){
+    'use strict';
+ 
+    var version = 0.4,
+        schemaVersion = 0.4,
+        
+        connections = [
+            {url: 'https://s3.amazonaws.com/files.d20.io/images/8838843/R3CXyTXIMM5XgBBgJ-XOZw/thumb.png?1429049473', size: 140, connection: '2Units'},
+            {url: 'https://s3.amazonaws.com/files.d20.io/images/8818967/iLi9d5yeGm6-RaP-33MPGA/thumb.png?1428944110', size: 280, connection: 'Corner'},
+            {url: 'https://s3.amazonaws.com/files.d20.io/images/8817601/MzWuTb-BTGPdCVX-ZN8w3g/thumb.png?1428942010', size: 280, connection: 'Stairs'},
+            {url: 'https://s3.amazonaws.com/files.d20.io/images/8816892/wHqwsma4S6d_9hjNd7Vaew/thumb.png?1428940855', size: 140, connection: '1Unit'}
+        ],
+        
+        swapIcon = 'https://s3.amazonaws.com/files.d20.io/images/8821111/fBVwB1f2_t7U3k8XrmbKxw/thumb.png?1428953603',
+        
+        installedTextures,
+        allTiles,
+        
+    macrosInstall = function() {
+        var controller = findObjs({ _type: 'character', name: 'Dungeon-Draw-Connection'})[0] || 
+            createObj('character', {name: 'Dungeon-Draw-Connection', avatar: swapIcon}),
+            ability = findObjs({_type: 'ability', name: '⇗▀⇘▄-Remove-Replace', characterid: controller.get('id')})[0] || 
+            createObj('ability', {name: '⇗▀⇘▄-Remove-Replace', characterid: controller.get('id'), action: '!DungeonMapperRemoveReplace', istokenaction: true});
+        
+        return controller.get('id');
+    },
+    
+    eigthBitClockwise = function(value, degree) {
+        var shift = (degree/90) * 2;
+        return (((value | (value << 8)) >> shift) & 255);
+    },
+    
+    dungeonDrawAddTool = function(tool) {
+        var pageId,
+            page,
+            center,
+            middle,
+            whichTool;
+            
+        whichTool = _.where(connections, {connection: tool});
+            
+        pageId = Campaign().get('playerpageid');
+        page = getObj('page', pageId);
+        center = Math.floor(page.get('width') / 2) * 70;
+        middle = Math.floor(page.get('height') / 2) * 70;
+        
+        createObj('graphic', {
+            type: 'graphic', 
+            subtype: 'token', 
+            pageid: pageId, 
+            layer: 'map', 
+            width: 70, 
+            height: 70,
+            left: center, 
+            top: middle, 
+            imgsrc: whichTool[0].url,
+            represents: macrosInstall()
+        });
+    },
+    
+    checkSelect = function(obj) {
+        var token;
+        if ( obj === undefined ) {return false; }
+        if ('graphic' !== obj._type) {return false; }
+        token = getObj('graphic', obj._id);
+        if ('map' !== token.get('layer')) {return false; }
+        return true;
+    },
+    
+    connectionsOne  = function(top, left, direction) {
+        var blocks = [];
+        blocks.push({offsetTop: top - 35, offsetLeft: left - 35, direction: 0});
+        blocks.push({offsetTop: top - 35, offsetLeft: left + 35, direction: 0});
+        blocks.push({offsetTop: top + 35, offsetLeft: left + 35, direction: 0});
+        blocks.push({offsetTop: top + 35, offsetLeft: left - 35, direction: 0});
+        return blocks;
+    },
+    
+    connectionsOnePlacementMask  = function(tileData) {
+        var placementData = [],
+            placeMask,
+            seekValue,
+            counter = 0,
+            spunMask,
+            spunValue;
+        
+        _.each(tileData, function(eachTile) {
+            spunMask = eigthBitClockwise(eachTile.Mask, eachTile.rotation)
+            spunValue = eigthBitClockwise(eachTile.value, eachTile.rotation)
+            placeMask = 255;
+            seekValue = 255;
+            
+            if( 0 === counter ) {
+                placeMask = 28; //BIts that must be a ! (1=open space)
+                seekValue = spunValue | placeMask; //OR togehter
+            }
+            if( 1 === counter ) {
+                placeMask = 7; //BIts that must be a ! (1=open space)
+                seekValue = spunValue | placeMask; //OR togehter
+            }
+            if( 2 === counter ) {
+                placeMask = 193; //BIts that must be a ! (1=open space)
+                seekValue = spunValue | placeMask; //OR togehter
+            }
+            if( 3 === counter ) {
+                placeMask = 112; //BIts that must be a ! (1=open space)
+                seekValue = spunValue | placeMask; //OR togehter
+            }
+            
+            placementData.push({
+                pack: eachTile.pack,
+                key: eachTile.key,
+                url: eachTile.url,
+                rotation: eachTile.rotation,
+                offsetLeft: eachTile.offsetLeft,
+                offsetTop: eachTile.offsetTop,
+                value: eachTile.value,
+                mask: eachTile.mask,
+                spunValue: spunValue,
+                spunMask: spunMask,
+                maskedValue: eachTile.maskedValue,
+                seekValue: seekValue
+            });
+            counter = counter + 1;
+        });
+        return placementData;
+    },
+    
+    getTileSpinValueMask = function(blocks) {
+        var listToGetBits = [],
+            check = [],
+            findTile,
+            pack, key, value, mask, rotation, url, maskedValue;
+            
+        _.each(blocks, function(eachBlocks) {
+            
+            check = [];
+            check = filterObjs(function(mapobj) {    
+                if( (mapobj.get('type') === 'graphic') && (mapobj.get('left') === eachBlocks.offsetLeft) && (mapobj.get('top') === eachBlocks.offsetTop) ) return true;    
+                else return false;
+            });
+            if( 0 < check.length ){
+                findTile = _.where(allTiles, {url: check[0].get('imgsrc')});
+                if( 0 < findTile.length ){
+                    pack = findTile[0].pack;
+                    key = findTile[0].key;
+                    value = findTile[0].value;
+                    mask = findTile[0].mask;
+                }else{
+                    pack = 'Old School|#18769c';
+                    key = 'DD_016';
+                    value = 0;
+                    mask = 255;
+                }
+                rotation = check[0].get('rotation');
+                url = check[0].get('imgsrc');
+            }else{
+                pack = 'Old School|#18769c';
+                key = 'DD_016';
+                value = 0;
+                mask = 255;
+                rotation = 0;
+                url = 'https://s3.amazonaws.com/files.d20.io/images/8399373/xVvUmlPrlY3Ln4Vll75kHA/thumb.jpg?1427051984';
+            }
+            maskedValue = eigthBitClockwise(value, rotation);
+            listToGetBits.push({
+                pack: pack,
+                key: key,
+                value: value,
+                mask: mask,
+                rotation: rotation,
+                url: url,
+                maskedValue: maskedValue,
+                offsetLeft: eachBlocks.offsetLeft,
+                offsetTop: eachBlocks.offsetTop
+            });
+        }); 
+        return listToGetBits;
+    },
+    
+    placeNewTile = function(data){
+        var check,
+            checkId,
+            checkType,
+            CheckObject;
+        
+        check = [];
+        check = filterObjs(function(mapobj) {    
+            if( (mapobj.get('pageid') === data[0].page) && (mapobj.get('type') === 'graphic') && (mapobj.get('left') === data[0].left) && (mapobj.get('top') === data[0].top) ) return true;    
+            else return false;
+        });
+        _.each(check, function(eachCheck) {
+            checkId = eachCheck.get('id');
+            checkType = eachCheck.get('type');
+            CheckObject = getObj(checkType, checkId);
+            CheckObject.remove();
+        }),
+        
+        createObj('graphic', {
+            type: 'graphic', 
+            subtype: 'token', 
+            pageid: data[0].page, 
+            layer: 'map', 
+            width: 70, 
+            height: 70,
+            left: data[0].left, 
+            top: data[0].top,
+            rotation: data[0].degree,
+            imgsrc: data[0].url,
+            name: data[0].key
+        });
+    },
+    
+    itemRemover = function () {
+        //left
+    },
+    
+    rightTileFoundFunction = function(page,rightTileSet,eachNeededTile){
+        var bitTiles = [],
+            newValue,
+            newMask,
+            i,
+            maskedMapSquare,
+            foundTiles,
+            createString = [];
+        
+        _.each(rightTileSet, function(eachTile) {
+            if( 0 !== eachTile.value ){
+                bitTiles.push({
+                    degree: 0, 
+                    value: eachTile.value,
+                    mask: eachTile.mask,
+                    url: eachTile.url,
+                    key: eachTile.key
+                });
+            }
+            newValue = eigthBitClockwise(eachTile.value, 90);
+            newMask = eigthBitClockwise(eachTile.mask, 90);
+            bitTiles.push({
+                degree: 90, 
+                value: newValue,
+                mask: newMask,
+                url: eachTile.url,
+                key: eachTile.key
+            });
+            newValue = eigthBitClockwise(eachTile.value, 180);
+            newMask = eigthBitClockwise(eachTile.mask, 180);
+            bitTiles.push({
+                degree: 180, 
+                value: newValue,
+                mask: newMask,
+                url: eachTile.url,
+                key: eachTile.key
+            });
+            newValue = eigthBitClockwise(eachTile.value, 270);
+            newMask = eigthBitClockwise(eachTile.mask, 270);
+            bitTiles.push({
+                degree: 270, 
+                value: newValue,
+                mask: newMask,
+                url: eachTile.url,
+                key: eachTile.key
+            });
+        }); 
+        i=0;
+            while (i < bitTiles.length) {
+                maskedMapSquare = eachNeededTile.seekValue & bitTiles[i].mask;
+                foundTiles = _.where(bitTiles, {value: maskedMapSquare});
+                if(bitTiles[i].value === maskedMapSquare){
+                    createString.push({
+                        page: page,
+                        degree: bitTiles[i].degree,
+                        url: bitTiles[i].url,
+                        top: eachNeededTile.offsetTop, 
+                        left: eachNeededTile.offsetLeft, 
+                        key: bitTiles[i].key
+                    });
+                    break;
+                }
+                i++;
+            }
+        return createString; 
+    },
+    
+    dungeonRemoveReplace = function(message) {
+        var selected = _.first(message.selected),
+            objCheck = checkSelect(selected),
+            obj,
+            ObjValues,
+            toolRotation,
+            direction,
+            blocks,
+            tileData,
+            placementData,
+            rightTileSet,
+            rightTileFound,
+            toolGraphic;
+        
+        if ( false === objCheck ) {return; }    
+        obj = getObj('graphic', selected._id);
+        
+        ObjValues = _.reduce(['name','pageid','rotation','left','top','flipv','fliph','id', 'imgsrc'],function(m,prop){
+            m[prop] = obj.get(prop);
+            return m;
+        }, {});
+        
+        toolRotation = (Math.round(ObjValues.rotation/90)*90)%360 + (ObjValues.rotation<0 ? 360 : 0);
+        switch(toolRotation) {
+            case 0:
+            case 180:
+                direction = 'NS';
+            break;
+            case 90:
+            case 270:
+                direction = 'EW';
+            break;
+        }
+        
+        //10 foot doorway
+        if( ObjValues.imgsrc === connections[0].url ) {
+            //Which BlocksTo Replace (locations undee the tool)
+            blocks = connectionsOne(ObjValues.top, ObjValues.left, direction);
+            //Tile Data (pack, URL, value, mask, spin)
+            tileData = getTileSpinValueMask(blocks);
+            placementData = connectionsOnePlacementMask(tileData);
+            _.each(placementData, function(eachNeededTile) {
+                rightTileSet = DungeonDrawTiles[eachNeededTile.pack];
+                rightTileFound = rightTileFoundFunction(ObjValues.pageid,rightTileSet,eachNeededTile);
+                placeNewTile(rightTileFound);
+            });
+            toolGraphic = findObjs({
+                _pageid: Campaign().get("playerpageid"),
+                _type: "graphic",  
+                imgsrc: 'https://s3.amazonaws.com/files.d20.io/images/8816897/6J1FHlzlmZ8rtekUo1lBPA/thumb.png?1428940859'
+            });
+            if( 0 < toolGraphic.length ){
+                toFront(toolGraphic[0]);
+            }
+            return;
+        }
+        
+        
+        
+        
+        
+        
+    },
+    
+    checkInstall = function() {
+        var i,
+            tempPack;
+            
+        installedTextures = [];    
+        Object.keys(DungeonDrawTiles).forEach(function(key) {
+            installedTextures.push(key);
+        });
+        
+        allTiles = [];
+        for (i = 0; i < installedTextures.length; i++) {
+            tempPack = _.clone(DungeonDrawTiles[installedTextures[i]]);
+            _.each(tempPack, function(eachTile) {
+                allTiles.push({
+                    url: eachTile.url,
+                    key: eachTile.key,
+                    value: eachTile.value,
+                    mask: eachTile.mask,
+                    pack: installedTextures[i]
+                });
+            });
+        }
+    },
+    
+    fixTool = function(obj) {
+        var ObjValues,
+            foundTiles,
+            find0, find1, find2, find3,
+            connectionTools = [];
+            
+        ObjValues = _.reduce(['name','pageid','rotation','left','top','flipv','fliph','id', 'imgsrc'],function(m,prop){
+            m[prop] = obj.get(prop);
+            return m;
+        }, {});
+
+        foundTiles = _.where(connections, {url: ObjValues.imgsrc});
+        if( 0 === foundTiles.length) {
+            return;
+        }
+        obj.set({
+            rotation: (Math.round(ObjValues.rotation/90)*90)%360 + (ObjValues.rotation<0 ? 360 : 0),
+            flipv: false,
+            fliph: false,
+            width: foundTiles[0].size,
+            height: foundTiles[0].size,
+            top: (Math.ceil(ObjValues.top/70)*70),
+            left: (Math.ceil(ObjValues.left/70)*70)
+        });
+        
+        connectionTools = [];
+        find0 = findObjs({_pageid: Campaign().get("playerpageid"), _type: "graphic", imgsrc: connections[0].url });
+        _.each(find0, function(findEach) {    
+            connectionTools.push(findEach.get('id'));
+        });
+        find1 = findObjs({_pageid: Campaign().get("playerpageid"), _type: "graphic", imgsrc: connections[1].url });
+        _.each(find1, function(findEach) {    
+            connectionTools.push(findEach.get('id'));
+        });
+        find2 = findObjs({_pageid: Campaign().get("playerpageid"), _type: "graphic", imgsrc: connections[2].url });
+        _.each(find2, function(findEach) {    
+            connectionTools.push(findEach.get('id'));
+        });
+        find3 = findObjs({_pageid: Campaign().get("playerpageid"), _type: "graphic", imgsrc: connections[3].url });
+        _.each(find3, function(findEach) {    
+            connectionTools.push(findEach.get('id'));
+        });
+        if( 1 < connectionTools.length ){
+        _.each(connectionTools, function(findEach) {
+            if(getObj('graphic', findEach)){
+                getObj('graphic', findEach).remove();
+            };
+        });
+        }else{
+           toFront(obj); 
+        }
+    },
+    
+    handleGraphicChange = function(obj) {
+        var foundTiles;
+        foundTiles = _.where(connections, {url: obj.get('imgsrc')});
+        if( 0 === foundTiles.length) {return; }
+        fixTool(obj);
+    },
+    
+    handleInput = function(msg) {
+        var message = _.clone(msg), args;
+        if ( 'api' !== message.type ) { return; }
+        args = msg.content.split(/\s+/);
+        if( args[0] === '!DungeonDrawConnection' ){dungeonDrawAddTool(args[1]); return; }
+        if( args[0] === '!DungeonMapperRemoveReplace' ){dungeonRemoveReplace(message); return; }
+    },
+
+    registerEventHandlers = function() {
+        on('chat:message', handleInput);
+        on('change:graphic', handleGraphicChange);
+        checkInstall();
+    };
+    return {
+        CheckInstall: checkInstall,
+        RegisterEventHandlers: registerEventHandlers,
+        Connections: connections
+    }; 
+}());
+
+on('ready',function(){
+    'use strict';
+    DungeonDrawConnections.RegisterEventHandlers();
+});
