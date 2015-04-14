@@ -8,9 +8,9 @@ var DungeonDraw = DungeonDraw || (function(){
     
     //Command: !DungeonDrawMenu
  
-    var version = 0.3,
+    var version = 0.2,
         lastUpdate = 1428930444, //Unix timestamp
-        schemaVersion = 0.3,
+        schemaVersion = 0.2,
         
         undo = [],
         
@@ -135,7 +135,7 @@ var DungeonDraw = DungeonDraw || (function(){
                                 +'</a>'
                         +'</div>'
                     +'</div>';
-                    */
+                */
         while (i < currentTiles.length) {
             tableText += '<div' + trowDivStyle + '>'
                         +'<div' + cellDivStyle + '>'
