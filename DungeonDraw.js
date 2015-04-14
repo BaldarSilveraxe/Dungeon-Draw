@@ -463,7 +463,7 @@ var DungeonDraw = DungeonDraw || (function(){
                     CheckLeft = ((columnCount - 1) * 70) + 35;
                     check = [];
                     check = filterObjs(function(mapobj) {    
-                        if( (mapobj.get('type') === 'graphic') && (mapobj.get('left') === CheckLeft) && (mapobj.get('top') === checkTop) ) return true;    
+                        if( (mapobj.get('pageid') === Campaign().get('playerpageid')) && (mapobj.get('type') === 'graphic') && (mapobj.get('left') === CheckLeft) && (mapobj.get('top') === checkTop) ) return true;    
                         else return false;
                     });
                     //log(check.length)
