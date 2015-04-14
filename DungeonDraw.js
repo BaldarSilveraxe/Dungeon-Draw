@@ -8,9 +8,9 @@ var DungeonDraw = DungeonDraw || (function(){
     
     //Command: !DungeonDrawMenu
  
-    var version = 0.3,
-        lastUpdate = 1429021012, //Unix timestamp
-        schemaVersion = 0.3,
+    var version = 0.4,
+        lastUpdate = 1428930444, //Unix timestamp
+        schemaVersion = 0.4,
         
         undo = [],
         
@@ -108,58 +108,58 @@ var DungeonDraw = DungeonDraw || (function(){
         }
         sendChat('Dungeon Draw Tools', ' ');
         tableText += '<div' + tablDivStyle + '>';
-                    /*
+                    /* */
                     tableText += '<div' + trowDivStyle + '>'
                         +'<div' + cellDivStyle + '>'
                                 +'<a href="!DungeonDrawConnection ' + DungeonDrawConnections.Connections[0].connection + '" ' + atagTwoStyle + '>'
-                                +'<img src="' + DungeonDrawConnections.Connections[0].url
-                                +' height="50" width="50" border="0"' + imagDivStyle + '">'
+                                +'<img src="'  + DungeonDrawConnections.Connections[0].url
+                                +'" height="50" width="50" border="0"' + imagDivStyle + '">'
                                 +'</a>'
                         +'</div>'
                         +'<div' + cellDivStyle + '>'
-                                +'<a href="!DungeonDrawConnection ' + DungeonDrawConnections.Connections[1].connection + '" ' + atagTwoStyle + '>'
-                                +'<img src="' + DungeonDrawConnections.Connections[1].url
-                                +' height="50" width="50" border="0"' + imagDivStyle + '">'
+                                +'<a href="!TAKENOACTION" ' + atagTwoStyle + '>'
+                                +'<img src="' + 'https://s3.amazonaws.com/files.d20.io/images/8838664/r-3M8jzLatXgeb88GnKy_g/thumb.jpg?1429048748'
+                                +'" height="50" width="50" border="0"' + imagDivStyle + '">'
                                 +'</a>'
                         +'</div>'
                         +'<div' + cellDivStyle + '>'
-                                +'<a href="!DungeonDrawConnection ' + DungeonDrawConnections.Connections[2].connection + '" ' + atagTwoStyle + '>'
-                                +'<img src="' + DungeonDrawConnections.Connections[2].url
-                                +' height="50" width="50" border="0"' + imagDivStyle + '">'
+                                +'<a href="!TAKENOACTION" ' + atagTwoStyle + '>'
+                                +'<img src="' + 'https://s3.amazonaws.com/files.d20.io/images/8838664/r-3M8jzLatXgeb88GnKy_g/thumb.jpg?1429048748'
+                                +'" height="50" width="50" border="0"' + imagDivStyle + '">'
                                 +'</a>'
                         +'</div>'
                         +'<div' + cellDivStyle + '>'
-                                +'<a href="!DungeonDrawConnection ' + DungeonDrawConnections.Connections[3].connection + '" ' + atagTwoStyle + '>'
-                                +'<img src="' + DungeonDrawConnections.Connections[3].url
-                                +' height="50" width="50" border="0"' + imagDivStyle + '">'
+                                +'<a href="!TAKENOACTION" ' + atagTwoStyle + '>'
+                                +'<img src="' + 'https://s3.amazonaws.com/files.d20.io/images/8838664/r-3M8jzLatXgeb88GnKy_g/thumb.jpg?1429048748'
+                                +'" height="50" width="50" border="0"' + imagDivStyle + '">'
                                 +'</a>'
                         +'</div>'
                     +'</div>';
-                */
+                /* */
         while (i < currentTiles.length) {
             tableText += '<div' + trowDivStyle + '>'
                         +'<div' + cellDivStyle + '>'
                                 +'<a href="!DungeonDrawNumber ' + currentTiles[i].key + '" ' + atagTwoStyle + '>'
                                 +'<img src="' + currentTiles[i].url
-                                +' height="50" width="50" border="0"' + imagDivStyle + '">'
+                                +'" height="50" width="50" border="0"' + imagDivStyle + '">'
                                 +'</a>'
                         +'</div>'
                         +'<div' + cellDivStyle + '>'
                                 +'<a href="!DungeonDrawNumber ' + currentTiles[i + 1].key + '" ' + atagTwoStyle + '>'
                                 +'<img src="' + currentTiles[i + 1].url
-                                +' height="50" width="50" border="0"' + imagDivStyle + '">'
+                                +'" height="50" width="50" border="0"' + imagDivStyle + '">'
                                 +'</a>'
                         +'</div>'
                         +'<div' + cellDivStyle + '>'
                                 +'<a href="!DungeonDrawNumber ' + currentTiles[i + 2].key + '" ' + atagTwoStyle + '>'
                                 +'<img src="' + currentTiles[i + 2].url
-                                +' height="50" width="50" border="0"' + imagDivStyle + '">'
+                                +'" height="50" width="50" border="0"' + imagDivStyle + '">'
                                 +'</a>'
                         +'</div>'
                         +'<div' + cellDivStyle + '>'
                                 +'<a href="!DungeonDrawNumber ' + currentTiles[i + 3].key + '" ' + atagTwoStyle + '>'
                                 +'<img src="' + currentTiles[i + 3].url
-                                +' height="50" width="50" border="0"' + imagDivStyle + '">'
+                                +'" height="50" width="50" border="0"' + imagDivStyle + '">'
                                 +'</a>'
                         +'</div>'
                     +'</div>';
