@@ -8,9 +8,9 @@ var DungeonDraw = DungeonDraw || (function(){
     
     //Command: !DungeonDrawMenu
  
-    var version = 0.2,
+    var version = 0.3,
         lastUpdate = 1428930444, //Unix timestamp
-        schemaVersion = 0.2,
+        schemaVersion = 0.3,
         
         undo = [],
         
@@ -106,9 +106,34 @@ var DungeonDraw = DungeonDraw || (function(){
             tag = atagForStyle;
             span = spanForStyle;
         }
-        
         sendChat('Dungeon Draw Tools', ' ');
         tableText += '<div' + tablDivStyle + '>';
+                    tableText += '<div' + trowDivStyle + '>'
+                        +'<div' + cellDivStyle + '>'
+                                +'<a href="!DungeonDrawConnection ' + DungeonDrawConnections.Connections[0].connection + '" ' + atagTwoStyle + '>'
+                                +'<img src="' + DungeonDrawConnections.Connections[0].url
+                                +' height="50" width="50" border="0"' + imagDivStyle + '">'
+                                +'</a>'
+                        +'</div>'
+                        +'<div' + cellDivStyle + '>'
+                                +'<a href="!DungeonDrawConnection ' + DungeonDrawConnections.Connections[1].connection + '" ' + atagTwoStyle + '>'
+                                +'<img src="' + DungeonDrawConnections.Connections[1].url
+                                +' height="50" width="50" border="0"' + imagDivStyle + '">'
+                                +'</a>'
+                        +'</div>'
+                        +'<div' + cellDivStyle + '>'
+                                +'<a href="!DungeonDrawConnection ' + DungeonDrawConnections.Connections[2].connection + '" ' + atagTwoStyle + '>'
+                                +'<img src="' + DungeonDrawConnections.Connections[2].url
+                                +' height="50" width="50" border="0"' + imagDivStyle + '">'
+                                +'</a>'
+                        +'</div>'
+                        +'<div' + cellDivStyle + '>'
+                                +'<a href="!DungeonDrawConnection ' + DungeonDrawConnections.Connections[3].connection + '" ' + atagTwoStyle + '>'
+                                +'<img src="' + DungeonDrawConnections.Connections[3].url
+                                +' height="50" width="50" border="0"' + imagDivStyle + '">'
+                                +'</a>'
+                        +'</div>'
+                    +'</div>';
         while (i < currentTiles.length) {
             tableText += '<div' + trowDivStyle + '>'
                         +'<div' + cellDivStyle + '>'
@@ -130,7 +155,7 @@ var DungeonDraw = DungeonDraw || (function(){
                                 +'</a>'
                         +'</div>'
                         +'<div' + cellDivStyle + '>'
-                                +'<a img href="!DungeonDrawNumber ' + currentTiles[i + 3].key + '" ' + atagTwoStyle + '>'
+                                +'<a href="!DungeonDrawNumber ' + currentTiles[i + 3].key + '" ' + atagTwoStyle + '>'
                                 +'<img src="' + currentTiles[i + 3].url
                                 +' height="50" width="50" border="0"' + imagDivStyle + '">'
                                 +'</a>'
@@ -391,6 +416,7 @@ var DungeonDraw = DungeonDraw || (function(){
                         mapBits += paddedAsciiMap[rowCount + 1][columnCount];
                         mapBits += paddedAsciiMap[rowCount + 1][columnCount - 1];
                         mapBits += paddedAsciiMap[rowCount][columnCount - 1];
+                        
                         tileSidePattern.push({
                             topTile: ((rowCount - 1) * 70) + 35,
                             leftTile: ((columnCount - 1) * 70) + 35,
@@ -411,7 +437,10 @@ var DungeonDraw = DungeonDraw || (function(){
             topMostTop = (path.pathTop - (path.height/2)) / 70,
             width = path.width / 70,
             height = path.height / 70,
-            currentPath;
+            currentPath,
+            checkTop,
+            CheckLeft,
+            check = [];
         
         //Flag tiles
         for (rowCount = 0; rowCount < height; rowCount++) {
@@ -428,7 +457,19 @@ var DungeonDraw = DungeonDraw || (function(){
                 if( 0 === rowCount || (pageHeight + 1) === rowCount || 0 === columnCount || (pageWidth + 1) === columnCount ){
                     paddedAsciiMap[rowCount][columnCount] = '0';
                 }else{
-                    paddedAsciiMap[rowCount][columnCount] = asciiMap[(rowCount - 1)][(columnCount - 1)];
+                    checkTop = ((rowCount - 1) * 70) + 35;
+                    CheckLeft = ((columnCount - 1) * 70) + 35;
+                    check = [];
+                    check = filterObjs(function(mapobj) {    
+                        if( (mapobj.get('type') === 'graphic') && (mapobj.get('left') === CheckLeft) && (mapobj.get('top') === checkTop) ) return true;    
+                        else return false;
+                    });
+                    //log(check.length)
+                    if( 0 === check.length) {
+                        paddedAsciiMap[rowCount][columnCount] = asciiMap[(rowCount - 1)][(columnCount - 1)];
+                    }else{
+                        paddedAsciiMap[rowCount][columnCount] = '0';    
+                    }
                 }
             }
         }
