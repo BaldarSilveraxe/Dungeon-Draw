@@ -8,9 +8,9 @@ var DungeonDraw = DungeonDraw || (function(){
     
     //Command: !DungeonDrawMenu
  
-    var version = 0.2,
-        lastUpdate = 1428930444, //Unix timestamp
-        schemaVersion = 0.2,
+    var version = 0.3,
+        lastUpdate = 1429021012, //Unix timestamp
+        schemaVersion = 0.3,
         
         undo = [],
         
