@@ -108,6 +108,7 @@ var DungeonDraw = DungeonDraw || (function(){
         }
         sendChat('Dungeon Draw Tools', ' ');
         tableText += '<div' + tablDivStyle + '>';
+                    /*
                     tableText += '<div' + trowDivStyle + '>'
                         +'<div' + cellDivStyle + '>'
                                 +'<a href="!DungeonDrawConnection ' + DungeonDrawConnections.Connections[0].connection + '" ' + atagTwoStyle + '>'
@@ -134,6 +135,7 @@ var DungeonDraw = DungeonDraw || (function(){
                                 +'</a>'
                         +'</div>'
                     +'</div>';
+                    */
         while (i < currentTiles.length) {
             tableText += '<div' + trowDivStyle + '>'
                         +'<div' + cellDivStyle + '>'
