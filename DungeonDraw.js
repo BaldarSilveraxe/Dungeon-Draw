@@ -41,7 +41,7 @@ var DungeonDraw = DungeonDraw || (function(){
         if( 'front' === direction ) {
             toFront(obj);
         }else{
-            toBront(obj);
+            toBack(obj);
         }
     },
     
