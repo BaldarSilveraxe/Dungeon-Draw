@@ -1,8 +1,8 @@
 var DungeonDoors = DungeonDoors || (function(){
     'use strict';
-    //version = 0.4
+    //version = 0.5
     //lastUpdate = 1428930444 //Unix timestamp
-    //schemaVersion = 0.4
+    //schemaVersion = 0.5
     
     var defaultTexture = 'Old School|#18769c',
     
