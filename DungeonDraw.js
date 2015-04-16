@@ -35,7 +35,6 @@ var DungeonDraw = DungeonDraw || (function(){
         atagForStyle = ' style="border: 1px solid Black; background-color: PaleGreen; color: Black;"',
         imagDivStyle = ' style="padding: 0px 0px 0px 0px; outline: none; border: none;"',
         spanOneStyle = ' style="color: white; font-weight: normal; display: block; width: 150px;"',
-        spanForStyle = ' style="color: Black; font-weight: normal; display: block; width: 150px;"',
     
     dungeonDrawChange = function() {
         var text = '/direct ',
@@ -181,11 +180,11 @@ var DungeonDraw = DungeonDraw || (function(){
     dungeonDrawSetTexture = function(message) {
         var pack = message.replace('!DungeonDrawSetTexture ', ''),
             switchPack = defaultTexture,
-            args;
+            messageArguments;
         
         _.each(installedTextures, function(eachTextures) {
-            args = eachTextures.split('|');
-            if( args[0] === pack ) {switchPack = eachTextures; } 
+            messageArguments = eachTextures.split('|');
+            if( messageArguments[0] === pack ) {switchPack = eachTextures; } 
         });
         
         state.DungeonDraw = {
@@ -226,6 +225,7 @@ var DungeonDraw = DungeonDraw || (function(){
     placeRotatedFlipPaths = function(givenPathData) {
         var temp, i, newX, newY, inputPath, angle, Xoffset, Yoffset, PathArray, maxX, minX, maxY, minY, objectWidth, objectHeight,
             objectTop, objectLeft, pathString, graphicID; 
+            
         _.each(givenPathData, function(given) {
             temp = [];
             for(i = 0; i < given.path.length; i = i + 1) {
@@ -311,8 +311,6 @@ var DungeonDraw = DungeonDraw || (function(){
             rotation: degree,
             name: key
         });
-        
-        setTimeout(function() {toFront(newObj); }, 500);
         
         placedTiles.push({
             id: newObj.get('id'),
@@ -477,7 +475,7 @@ var DungeonDraw = DungeonDraw || (function(){
         if( 0 === undo.length ){return; }
         copyPaths = _.clone(undo); 
         
-        pageid =  getObj('path', _.first(copyPaths)).get('pageid');
+        pageid =  Campaign().get('playerpageid');
         page = getObj('page', pageid);
         pageWidth =  page.get('width');
         pageHeight =  page.get('height');
@@ -514,11 +512,10 @@ var DungeonDraw = DungeonDraw || (function(){
     },
  
     dungeonDrawUndo = function() {
-        var lastItem,
-            obj;
+        var obj;
+        
         if( 0 === undo.length ){return; }
-        lastItem = undo.pop();
-        obj = getObj('path', lastItem);
+        obj = getObj('path', undo.pop());
         obj.remove(); 
     },
     
@@ -539,13 +536,11 @@ var DungeonDraw = DungeonDraw || (function(){
     },
     
     handleGraphicDestroy = function(obj) {
-        var foundTiles = _.where(currentTiles, {key: obj.get('name')});
-            
-        placedTiles = _.reject(placedTiles,function(o){
-            return obj.get('id') === o.id;
-        });
+        var foundTiles = _.where(currentTiles, {key: obj.get('name')}),
+            placedTiles = _.reject(placedTiles,function(o){
+                return obj.get('id') === o.id;
+            });
         
-        foundTiles = _.where(currentTiles, {key: obj.get('name')});
         if( 0 === foundTiles.length) {return; }
         if ( (255 === foundTiles[0].value) && (0 === foundTiles[0].mask) ){return; }
         
@@ -557,7 +552,6 @@ var DungeonDraw = DungeonDraw || (function(){
     handleGraphicChange = function(obj) {
         var ObjValues,
             foundTiles,
-            value, 
             bitCount,
             featurePathArray,
             pathValue;
@@ -567,46 +561,26 @@ var DungeonDraw = DungeonDraw || (function(){
             return m;
         }, {});
         
-        
         foundTiles = _.where(currentTiles, {key: ObjValues.name});
         if( 0 === foundTiles.length) {return; }
         if ( (255 === foundTiles[0].value) && (0 === foundTiles[0].mask) ){return; }
         
-        value = foundTiles[0].value; 
-        
         _.each( findObjs({_type: 'path', controlledby: ObjValues.id}), function(eachPath) {
             eachPath.remove();
         });
-
         
         featurePathArray = [];
         for (bitCount = 0; bitCount < 8; bitCount = bitCount + 1) {
-            if (!(value & (1<<bitCount))) {
+            if (!(foundTiles[0].value & (1<<bitCount))) {
                 switch(bitCount + 1) {
-                    case 1:
-                        pathValue = [[0,-1],[0,71]];
-                    break;
-                    case 2:
-                        pathValue = [[0,68],[0,70],[2,70]];
-                    break;
-                    case 3:
-                        pathValue = [[-1,70],[71,70]];
-                    break;
-                    case 4:
-                        pathValue =  [[70,68],[70,70],[68,70]];
-                    break;
-                    case 5:
-                        pathValue = [[70,-1],[70,71]];
-                    break;
-                    case 6:
-                        pathValue = [[70,2],[70,0],[68,0]];
-                    break;
-                    case 7:
-                        pathValue = [[-1,0],[71,0]];
-                    break;
-                    case 8:
-                        pathValue = [[0,2],[0,0],[2,0]];
-                    break;
+                    case 1: pathValue = [[0,-1],[0,71]];  break;
+                    case 2: pathValue = [[0,68],[0,70],[2,70]]; break;
+                    case 3: pathValue = [[-1,70],[71,70]]; break;
+                    case 4: pathValue = [[70,68],[70,70],[68,70]]; break;
+                    case 5: pathValue = [[70,-1],[70,71]]; break;
+                    case 6: pathValue = [[70,2],[70,0],[68,0]]; break;
+                    case 7: pathValue = [[-1,0],[71,0]]; break;
+                    case 8: pathValue = [[0,2],[0,0],[2,0]]; break;
                 }
                 if(pathValue){
                     featurePathArray.push({
@@ -630,8 +604,8 @@ var DungeonDraw = DungeonDraw || (function(){
     },
     
     getCenter = function(xy, wh) {
-        var center;
-        center = (Math.round((xy - (wh / 2))/35) * 35) / 70;
+        var center = (Math.round((xy - (wh / 2))/35) * 35) / 70;
+        
         center = center - Math.floor(center);
         if( 0.5 === center ) {
             xy = xy - 35;
@@ -641,16 +615,10 @@ var DungeonDraw = DungeonDraw || (function(){
    
     handlePathAdd = function(obj) {
         if( false === state.DungeonDraw.drawMode ){return; }
-        var ObjValues,
-            left,
-            top,  
-            width,
-            height,  
-            newPath,             
-            createdPath,
-            newObj;
+        var ObjValues,             
+            createdPath;
             
-        ObjValues = _.reduce(['name','layer','pageid','stroke','left','top','width','height','id'],function(m,prop){
+        ObjValues = _.reduce(['layer','pageid','stroke','left','top','width','height'],function(m,prop){
             m[prop] = obj.get(prop);
             return m;
         }, {});
@@ -658,22 +626,14 @@ var DungeonDraw = DungeonDraw || (function(){
         if( 'map' !== ObjValues.layer ){return; }
         obj.remove(); 
         
-        width = Math.ceil(ObjValues.width/70) * 70;
-        height = Math.ceil(ObjValues.height/70) * 70;
-        top = Math.ceil(ObjValues.top/35) * 35;
-        top = getCenter(top, height);
-        left = Math.ceil(ObjValues.left/35) * 35;
-        left = getCenter(left, width); 
-        newPath = '[["M",0,0],["L",' + width + ',0],["L",' + width + ',' + height + '],["L",0,' + height + '],["L",0,0]]';
-
-        newObj = createdPath = createObj('path',{ 
+        createdPath = createObj('path',{ 
             pageid: ObjValues.pageid, 
             layer: ObjValues.layer, 
-            path: newPath,
-            left: left,
-            top: top,
-            width: width, 
-            height: height, 
+            path: '[["M",0,0],["L",' + (Math.ceil(ObjValues.width/70) * 70) + ',0],["L",' + (Math.ceil(ObjValues.width/70) * 70) + ',' + (Math.ceil(ObjValues.height/70) * 70) + '],["L",0,' + (Math.ceil(ObjValues.height/70) * 70) + '],["L",0,0]]',
+            left: getCenter((Math.ceil(ObjValues.left/35) * 35), (Math.ceil(ObjValues.width/70) * 70)),
+            top: getCenter((Math.ceil(ObjValues.top/35) * 35), (Math.ceil(ObjValues.height/70) * 70)),
+            width: (Math.ceil(ObjValues.width/70) * 70), 
+            height: (Math.ceil(ObjValues.height/70) * 70), 
             fill: ObjValues.stroke,
             stroke: ObjValues.stroke,
             stroke_width: 1,
@@ -681,7 +641,7 @@ var DungeonDraw = DungeonDraw || (function(){
         });
         
         undo.push(createdPath.get('id'));
-        setTimeout(function() {toBack(newObj); }, 500);
+        setTimeout(function() {toBack(createdPath); }, 500);
     },
     
     handlePathDestroy = function(obj) {
@@ -689,50 +649,39 @@ var DungeonDraw = DungeonDraw || (function(){
     },
     
     handleInput = function(msg) {
-        var message = _.clone(msg), args;
+        var message = _.clone(msg), messageArguments;
         
         if ( 'api' !== message.type ) {return; }
-        
-        args = msg.content.split(/\s+/);
-        if( args[0] === '!DungeonDrawMenu' ){
-            dungeonDrawMenu(); 
-            return;
-        }
-        
-        if ( args[0] === '!DungeonDrawMode') {
-            state.DungeonDraw.drawMode = (state.DungeonDraw.drawMode === true ? false : true);
-            dungeonDrawMenu();
-            return;
-        }
-        
-        if( false === state.DungeonDraw.drawMode ){return; }
         if( true === dungeonDrawProcessing ){return; }
+        
+        messageArguments = message.content.split(/\s+/);
+        
+        if ( messageArguments[0] === '!DungeonDrawMode') { 
+            state.DungeonDraw.drawMode = (state.DungeonDraw.drawMode === true ? false : true); 
+        }
+        if( (messageArguments[0] === '!DungeonDrawMenu') || (messageArguments[0] === '!DungeonDrawMode') ){
+            dungeonDrawMenu();  
+            return;
+        }
+        if( false === state.DungeonDraw.drawMode ){return; }
+        
         dungeonDrawProcessing = true;
-
-        switch(args[0]) { 
-            case '!DungeonDrawUndo': //
-                dungeonDrawUndo(); 
-                break;  
-            case '!DungeonDrawMap': 
-                dungeonDrawMap(); 
-                break;   
-            case '!DungeonDrawClear': //
-                clearMap(args[1]); 
-                break;  
-            case '!DungeonDrawColor': //
-                colorMap(); 
-                break; 
-            case '!DungeonDrawNumber': //
-                dungeonDrawNumber(args[1]); 
-                break;  
-            case '!DungeonDrawChange': //
-                dungeonDrawChange(); 
-                break;  
-            case '!DungeonDrawSetTexture': //
-                dungeonDrawSetTexture(message.content); 
-                break;
+        
+        switch(messageArguments[0]) { 
+            case '!DungeonDrawUndo': dungeonDrawUndo(); break;  
+            case '!DungeonDrawMap': dungeonDrawMap(); break;   
+            case '!DungeonDrawClear': clearMap(messageArguments[1]); break;  
+            case '!DungeonDrawColor': colorMap();  break; 
+            case '!DungeonDrawNumber': dungeonDrawNumber(messageArguments[1]); break;  
+            case '!DungeonDrawChange': dungeonDrawChange(); break;  
+            case '!DungeonDrawSetTexture': dungeonDrawSetTexture(message.content); break;
         }
         dungeonDrawProcessing = false;
+    },
+    
+    handlePageChange = function(obj) {
+        undo = [];
+        placedTiles = [];
     },
  
     registerEventHandlers = function() {
@@ -741,6 +690,7 @@ var DungeonDraw = DungeonDraw || (function(){
         on('destroy:graphic', handleGraphicDestroy);
         on('add:path', handlePathAdd);
         on('destroy:path', handlePathDestroy);
+        on('change:campaign:playerpageid', handlePageChange);
         checkInstall();
     };
     return {
