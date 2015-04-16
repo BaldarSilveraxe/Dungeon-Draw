@@ -1,8 +1,8 @@
 var DungeonDrawConnections = DungeonDrawConnections || (function(){
     'use strict';
  
-    var version = 0.4,
-        schemaVersion = 0.4,
+    var version = 0.5,
+        schemaVersion = 0.5,
         
         connections = [
             {url: 'https://s3.amazonaws.com/files.d20.io/images/8838843/R3CXyTXIMM5XgBBgJ-XOZw/thumb.png?1429049473', size: 140, connection: '2Units'},
