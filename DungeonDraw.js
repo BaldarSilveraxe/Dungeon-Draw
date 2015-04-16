@@ -8,11 +8,12 @@ var DungeonDraw = DungeonDraw || (function(){
     
     //Command: !DungeonDrawMenu
  
-    var version = 0.5,
+    var version = 0.6,
         lastUpdate = 1428930444, //Unix timestamp
-        schemaVersion = 0.5,
+        schemaVersion = 0.6,
         
         undo = [],
+        placedTiles = [],
         dungeonDrawProcessing = false,
         
         //asciiMap[rowCount][columnCount])
@@ -24,7 +25,6 @@ var DungeonDraw = DungeonDraw || (function(){
         defaultTexture = 'Old School|#18769c',
         installedTextures = [],
         currentTiles,
-        activePage = false,
         
         tablDivStyle = ' style="display: table;"',
         trowDivStyle = ' style="display: table-row;"',
@@ -36,14 +36,6 @@ var DungeonDraw = DungeonDraw || (function(){
         imagDivStyle = ' style="padding: 0px 0px 0px 0px; outline: none; border: none;"',
         spanOneStyle = ' style="color: white; font-weight: normal; display: block; width: 150px;"',
         spanForStyle = ' style="color: Black; font-weight: normal; display: block; width: 150px;"',
-        
-    setBackFront = function(obj,direction) {
-        if( 'front' === direction ) {
-            toFront(obj);
-        }else{
-            toBack(obj);
-        }
-    },
     
     dungeonDrawChange = function() {
         var text = '/direct ',
@@ -100,23 +92,21 @@ var DungeonDraw = DungeonDraw || (function(){
             name: key
         });
         
-        setTimeout(function() {setBackFront(newObj,'front')}, 500);
+        setTimeout(function() {toFront(newObj); }, 500);
+        newObj.set('gmnotes', newObj.get('id'));
     },
     
     dungeonDrawMenu = function() {
         var i = 0,
-        mode,
-        tableText = '',
-        tag, span;
+            mode = '◯-Draw-Is-<b>ON</b>',
+            tag = atagForStyle,
+            span = spanOneStyle,
+            tableText = '';
         
         if( false === state.DungeonDraw.drawMode ){
             mode = '◯-Draw-Is-<b>OFF</b>';
             tag = atagThrStyle;
             span = spanOneStyle;
-        }else{
-            mode = '◯-Draw-Is-<b>ON</b>';
-            tag = atagForStyle;
-            span = spanForStyle;
         }
         sendChat('Dungeon Draw Tools', ' ');
         tableText += '<div' + tablDivStyle + '>';
@@ -210,38 +200,18 @@ var DungeonDraw = DungeonDraw || (function(){
     },
     
     clearMap = function(y) {
-        var currentPageGraphics = findObjs({                              
-            _pageid: Campaign().get('playerpageid'),                              
-            _type: 'graphic',
-            layer: 'map'
-        });
+        if( 'Y' !== y.toUpperCase() ){return; }
         
-        if( 'Y' !== y ){return; }
-        
-        _.each(currentPageGraphics, function(obj) {    
+        _.each(findObjs({_pageid: Campaign().get('playerpageid'), _type: 'graphic', layer: 'map'}), function(obj) {    
             getObj('graphic', obj.id).remove();
         });
-        currentPageGraphics = findObjs({                              
-            _pageid: Campaign().get('playerpageid'),                              
-            _type: 'path',
-            layer: 'map'
-        });
-        _.each(currentPageGraphics, function(obj) {    
+        
+        _.each(findObjs({_pageid: Campaign().get('playerpageid'),  _type: 'path', layer: 'map'}), function(obj) {    
             getObj('path', obj.id).remove();
         });
+        
         undo = [];
-    },
-    
-    checkSelect = function(obj) {
-        var token;
-        
-        if ( obj === undefined ) {return false; }
-        if ('graphic' !== obj._type) {return false; }
-        
-        token = getObj('graphic', obj._id);
-        
-        if ('objects' !== token.get('layer')) {return false; }
-        return true;
+        placedTiles = [];
     },
     
     pathingRotation = function(angle, point,width,height) {
@@ -255,10 +225,10 @@ var DungeonDraw = DungeonDraw || (function(){
     
     placeRotatedFlipPaths = function(givenPathData) {
         var temp, i, newX, newY, inputPath, angle, Xoffset, Yoffset, PathArray, maxX, minX, maxY, minY, objectWidth, objectHeight,
-            objectTop, objectLeft, pathString, graphicID, newPath; 
+            objectTop, objectLeft, pathString, graphicID; 
         _.each(givenPathData, function(given) {
             temp = [];
-            for(i = 0; i < given.path.length; i++) {
+            for(i = 0; i < given.path.length; i = i + 1) {
                 newX = given.path[i][0];
                 newY = given.path[i][1];
                 if(given.fliph){newX = given.width - given.path[i][0]; }
@@ -279,7 +249,7 @@ var DungeonDraw = DungeonDraw || (function(){
             minX = false;
             maxY = 0;
             minY = false;
-            for(i = 0; i < inputPath.length; i++) {
+            for(i = 0; i < inputPath.length; i = i + 1) {
                 PathArray.push([inputPath[i][0], inputPath[i][1]]);
                 PathArray[i] = pathingRotation(angle, PathArray[i],given.width,given.height);
                 if(PathArray[i][0] > maxX) {maxX = PathArray[i][0]; }
@@ -291,12 +261,12 @@ var DungeonDraw = DungeonDraw || (function(){
             objectHeight = maxY - minY;
             objectTop = minY + (objectHeight/2); 
             objectLeft = minX + (objectWidth/2);
-            for(i = 0; i < PathArray.length; i++) {
+            for(i = 0; i < PathArray.length; i = i + 1) {
                 PathArray[i][0] = PathArray[i][0] - minX;
                 PathArray[i][1] = PathArray[i][1] - minY;
             }
             pathString = "";
-            for(i = 0; i < PathArray.length; i++) {
+            for(i = 0; i < PathArray.length; i = i + 1) {
                 if(i !== 0) {
                     pathString += ",[\"L\"," + PathArray[i][0] + "," + PathArray[i][1] + "]";
                 } else {
@@ -328,7 +298,7 @@ var DungeonDraw = DungeonDraw || (function(){
     },
     
     createTile = function(pageid, degree, url, topTile, leftTile, key) {
-        createObj('graphic', {
+        var newObj = createObj('graphic', {
             type: 'graphic', 
             subtype: 'token', 
             pageid: pageid, 
@@ -340,6 +310,16 @@ var DungeonDraw = DungeonDraw || (function(){
             imgsrc: url,
             rotation: degree,
             name: key
+        });
+        
+        setTimeout(function() {toFront(newObj); }, 500);
+        
+        placedTiles.push({
+            id: newObj.get('id'),
+            pageid: pageid,
+            key: key,
+            left: leftTile,
+            top: topTile
         });
     },
 
@@ -353,8 +333,7 @@ var DungeonDraw = DungeonDraw || (function(){
             newValue,
             newMask,
             maskedMapSquare,
-            i,
-            foundTiles;
+            i;
             
         _.each(currentTiles, function(eachTile) {
             if( 0 !== eachTile.value ){
@@ -399,12 +378,11 @@ var DungeonDraw = DungeonDraw || (function(){
             i=0;
             while (i < bitTiles.length) {
                 maskedMapSquare = parseInt( eachTile.mapBits, 2 ) & bitTiles[i].mask;
-                foundTiles = _.where(bitTiles, {value: maskedMapSquare});
                 if(bitTiles[i].value === maskedMapSquare){
                     createTile(pageid, bitTiles[i].degree, bitTiles[i].url, eachTile.topTile, eachTile.leftTile, bitTiles[i].key);
                     break;
                 }
-                i++;
+                i = i + 1;
             }
             
         });
@@ -416,9 +394,9 @@ var DungeonDraw = DungeonDraw || (function(){
             mapBits; 
         
         tileSidePattern = [];
-        for (rowCount = 0; rowCount < (pageHeight + 2); rowCount++) {
-            for (columnCount = 0; columnCount < (pageWidth + 2); columnCount++) {
-                if( (0 !== rowCount) && (0 !== columnCount) && (pageHeight) >= rowCount && (pageWidth) >= columnCount ) {
+        for (rowCount = 0; rowCount < (pageHeight + 2); rowCount = rowCount + 1) {
+            for (columnCount = 0; columnCount < (pageWidth + 2); columnCount = columnCount + 1) {
+                if( (0 !== rowCount) && (0 !== columnCount) && (pageHeight >= rowCount) && (pageWidth >= columnCount) ) {
                     if( '1' === paddedAsciiMap[rowCount][columnCount]) {
                         mapBits = paddedAsciiMap[rowCount - 1][columnCount - 1];
                         mapBits += paddedAsciiMap[rowCount - 1][columnCount];
@@ -455,27 +433,23 @@ var DungeonDraw = DungeonDraw || (function(){
             check = [];
         
         //Flag tiles
-        for (rowCount = 0; rowCount < height; rowCount++) {
-            for (columnCount = 0; columnCount < width; columnCount++) {
+        for (rowCount = 0; rowCount < height; rowCount = rowCount + 1) {
+            for (columnCount = 0; columnCount < width; columnCount = columnCount + 1) {
                 asciiMap[topMostTop + rowCount][leftMostLeft + columnCount] = "1";
             }
         }
         
         //Pad Edges
         paddedAsciiMap = [];
-        for (rowCount = 0; rowCount < (pageHeight + 2); rowCount++) {
+        for (rowCount = 0; rowCount < (pageHeight + 2); rowCount = rowCount + 1) {
             paddedAsciiMap[rowCount] = [];
-            for (columnCount = 0; columnCount < (pageWidth + 2); columnCount++) {
+            for (columnCount = 0; columnCount < (pageWidth + 2); columnCount = columnCount + 1) {
                 if( 0 === rowCount || (pageHeight + 1) === rowCount || 0 === columnCount || (pageWidth + 1) === columnCount ){
                     paddedAsciiMap[rowCount][columnCount] = '0';
                 }else{
                     checkTop = ((rowCount - 1) * 70) + 35;
                     CheckLeft = ((columnCount - 1) * 70) + 35;
-                    check = [];
-                    check = filterObjs(function(mapobj) {    
-                        if( (mapobj.get('layer') === 'map') && (mapobj.get('pageid') === Campaign().get('playerpageid')) && (mapobj.get('type') === 'graphic') && (mapobj.get('left') === CheckLeft) && (mapobj.get('top') === checkTop) ) return true;    
-                        else return false;
-                    });
+                    check = _.where(placedTiles, {left: CheckLeft, top: checkTop});
                     if( 0 === check.length) {
                         paddedAsciiMap[rowCount][columnCount] = asciiMap[(rowCount - 1)][(columnCount - 1)];
                     }else{
@@ -509,9 +483,9 @@ var DungeonDraw = DungeonDraw || (function(){
         pageHeight =  page.get('height');
         
         asciiMap = [];
-        for (rowCount = 0; rowCount < pageHeight; rowCount++) {
+        for (rowCount = 0; rowCount < pageHeight; rowCount = rowCount + 1) {
             asciiMap[rowCount] = [];
-            for (columnCount = 0; columnCount < pageWidth; columnCount++) {
+            for (columnCount = 0; columnCount < pageWidth; columnCount = columnCount + 1) {
                 asciiMap[rowCount][columnCount] = '0';
             }
         }
@@ -565,24 +539,18 @@ var DungeonDraw = DungeonDraw || (function(){
     },
     
     handleGraphicDestroy = function(obj) {
-        var foundTiles,
-            locatedPaths = findObjs({                                                          
-                _type: 'path',
-                controlledby: obj.get('_id')
-            });
+        var foundTiles = _.where(currentTiles, {key: obj.get('name')});
+            
+        placedTiles = _.reject(placedTiles,function(o){
+            return obj.get('id') === o.id;
+        });
         
         foundTiles = _.where(currentTiles, {key: obj.get('name')});
-        if( 0 === foundTiles.length) {
-            return;
-        }
-        if ( (255 === foundTiles[0].value) && (0 === foundTiles[0].mask) ){
-            return;
-        }
+        if( 0 === foundTiles.length) {return; }
+        if ( (255 === foundTiles[0].value) && (0 === foundTiles[0].mask) ){return; }
         
-        _.each(locatedPaths, function(eachPath) {
-            if (eachPath.length !== 0) { 
-                eachPath.remove();
-            }
+        _.each(findObjs({_type: 'path', controlledby: obj.get('_id') }), function(eachPath) {
+            eachPath.remove();
         });
     },
     
@@ -592,7 +560,6 @@ var DungeonDraw = DungeonDraw || (function(){
             value, 
             bitCount,
             featurePathArray,
-            locatedPaths,
             pathValue;
             
         ObjValues = _.reduce(['name','pageid','rotation','left','top','flipv','fliph','id'],function(m,prop){
@@ -602,27 +569,18 @@ var DungeonDraw = DungeonDraw || (function(){
         
         
         foundTiles = _.where(currentTiles, {key: ObjValues.name});
-        if( 0 === foundTiles.length) {
-            return;
-        }
-        if ( (255 === foundTiles[0].value) && (0 === foundTiles[0].mask) ){
-            return;
-        }
-        activePage = ObjValues.pageid; 
+        if( 0 === foundTiles.length) {return; }
+        if ( (255 === foundTiles[0].value) && (0 === foundTiles[0].mask) ){return; }
+        
         value = foundTiles[0].value; 
         
-        locatedPaths = findObjs({                                                          
-            _type: 'path',
-            controlledby: ObjValues.id
+        _.each( findObjs({_type: 'path', controlledby: ObjValues.id}), function(eachPath) {
+            eachPath.remove();
         });
-        _.each(locatedPaths, function(eachPath) {
-            if (eachPath.length !== 0) { 
-                eachPath.remove();
-            }
-        });
+
         
         featurePathArray = [];
-        for (bitCount = 0; bitCount < 8; bitCount++) {
+        for (bitCount = 0; bitCount < 8; bitCount = bitCount + 1) {
             if (!(value & (1<<bitCount))) {
                 switch(bitCount + 1) {
                     case 1:
@@ -668,7 +626,7 @@ var DungeonDraw = DungeonDraw || (function(){
             }
         }
         placeRotatedFlipPaths(featurePathArray);
-        toFront(obj);
+        setTimeout(function() {toFront(obj); }, 500);
     },
     
     getCenter = function(xy, wh) {
@@ -698,7 +656,6 @@ var DungeonDraw = DungeonDraw || (function(){
         }, {});
         
         if( 'map' !== ObjValues.layer ){return; }
-        activePage = ObjValues.id;
         obj.remove(); 
         
         width = Math.ceil(ObjValues.width/70) * 70;
@@ -724,24 +681,17 @@ var DungeonDraw = DungeonDraw || (function(){
         });
         
         undo.push(createdPath.get('id'));
-        
-        setTimeout(function() {setBackFront(newObj,'front')}, 500);
+        setTimeout(function() {toBack(newObj); }, 500);
     },
     
     handlePathDestroy = function(obj) {
         undo = _.without(undo, obj.get('id'));
     },
-
-    handlePathChange = function(obj) {
-        //log(obj);
-    },
     
     handleInput = function(msg) {
         var message = _.clone(msg), args;
         
-        if ( 'api' !== message.type ) {
-            return; 
-        }
+        if ( 'api' !== message.type ) {return; }
         
         args = msg.content.split(/\s+/);
         if( args[0] === '!DungeonDrawMenu' ){
@@ -755,40 +705,29 @@ var DungeonDraw = DungeonDraw || (function(){
             return;
         }
         
-        if( false === state.DungeonDraw.drawMode ){
-            return; 
-        }
-        
-        if( true === dungeonDrawProcessing ){
-            return; 
-        }
+        if( false === state.DungeonDraw.drawMode ){return; }
+        if( true === dungeonDrawProcessing ){return; }
         dungeonDrawProcessing = true;
 
         switch(args[0]) { 
             case '!DungeonDrawUndo': //
                 dungeonDrawUndo(); 
-                break;
-                
+                break;  
             case '!DungeonDrawMap': 
                 dungeonDrawMap(); 
-                break;
-                
+                break;   
             case '!DungeonDrawClear': //
                 clearMap(args[1]); 
-                break;
-                
+                break;  
             case '!DungeonDrawColor': //
                 colorMap(); 
-                break;
-                
+                break; 
             case '!DungeonDrawNumber': //
                 dungeonDrawNumber(args[1]); 
-                break;
-                
+                break;  
             case '!DungeonDrawChange': //
                 dungeonDrawChange(); 
-                break;
-                
+                break;  
             case '!DungeonDrawSetTexture': //
                 dungeonDrawSetTexture(message.content); 
                 break;
@@ -801,7 +740,6 @@ var DungeonDraw = DungeonDraw || (function(){
         on('change:graphic', handleGraphicChange);
         on('destroy:graphic', handleGraphicDestroy);
         on('add:path', handlePathAdd);
-        on('change:path', handlePathChange);
         on('destroy:path', handlePathDestroy);
         checkInstall();
     };
