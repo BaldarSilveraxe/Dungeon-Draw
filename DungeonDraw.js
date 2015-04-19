@@ -7,50 +7,324 @@ var DungeonDraw = DungeonDraw || (function(){
     ------------------- */
     
     //Command: !DungeonDrawMenu
- 
-    var version = 0.6,
-        lastUpdate = 1428930444, //Unix timestamp
-        schemaVersion = 0.6,
-        
-        undo = [],
-        placedTiles = [],
-        dungeonDrawProcessing = false,
-        
-        //asciiMap[rowCount][columnCount])
-        asciiMap = [],
-        paddedAsciiMap = [],
-        
-        tileSidePattern = [],
-        
-        defaultTexture = 'Old School|#18769c',
-        installedTextures = [],
-        currentTiles,
-        
-        tablDivStyle = ' style="display: table;"',
-        trowDivStyle = ' style="display: table-row;"',
-        cellDivStyle = ' style="display: table-cell; border-collapse: collapse; padding-left: 0px; padding-right: 0px;"',
-        atagOneStyle = ' style="border: 1px solid AliceBlue; background-color: SteelBlue; color: white;"',
-        atagTwoStyle = ' style="border: 1px solid Black; background-color: White; color: white;"',
-        atagThrStyle = ' style="border: 1px solid DarkGray; background-color: DarkGray; color: white;"',
-        atagForStyle = ' style="border: 1px solid Black; background-color: PaleGreen; color: Black;"',
-        imagDivStyle = ' style="padding: 0px 0px 0px 0px; outline: none; border: none;"',
-        spanOneStyle = ' style="color: white; font-weight: normal; display: block; width: 150px;"',
     
-    dungeonDrawChange = function() {
-        var text = '/direct ',
-            args;
+    //version
+    var version = 1.0,
+        lastUpdate = 1429442387, //Unix timestamp
+        schemaVersion = 1.0,
+        deferred={
+            batchSize: 30,
+            initialDefer: 10,
+            batchDefer: 10
+        },
+        seq = (function(seed) {
+            var count = seed;
+            return function(){
+                return ++seed;
+            };
+        }(0)),
         
-        if( 0 === installedTextures.length) {return; }
+    //Check Installs
+    defaultTexture = 'Old School|#18769c',
+    installedTextures = [],
+    allTexturesTiles = [],
+    bitTiles = [],
+    currentTiles,
+    currentTextureName,
+    currentPageId,
+    
+    //Main Script
+    objExtractKeys = ['id','pageid','stroke','rotation','layer','width','height','top','left','controlledby'],
+    undoPaths = [],
+    dungeonDrawProcessing = false,
+    pathToGrid = [], //left:top
+    placedToGrid = [], //left:top
+
+    getUnderRaise = function(token) {
+        var squares = [],
+            foundSuqare,
+            foundBits,
+            theseTiles = [],
+            thisPageId = token.get('pageid'),
+            tile1,
+            tile2,
+            tile3,
+            tile4,
+            currentTileBits,
+            seekBits,
+            seekPack = 'none',
+            seekDegree,
+            checkTiles,
+            i,
+            maskedMapSquare,
+            changeTarget;
+            
+        bitTiles = [];
+        getAllBitTiles();
         
-        _.each(installedTextures, function(eachTextures) {
-            args = eachTextures.split('|');
-            if( 2 !== args.length){return; }
+        //AND Logic
+        squares = [
+            {sqr: 1,  left: -70,  top: -70,  outer: false, mask: 247},
+            {sqr: 2,  left: 0,    top: -70,  outer: false, mask: 251},
+            {sqr: 3,  left: +70,  top: -70,  outer: false, mask: 253},
+            {sqr: 4,  left: +70,  top: 0,    outer: false, mask: 254},
+            {sqr: 4,  left: +70,  top: +70,  outer: false, mask: 127},
+            {sqr: 4,  left: 0,    top: +70,  outer: false, mask: 191},
+            {sqr: 5,  left: -70,  top: +70,  outer: false, mask: 223},
+            {sqr: 5,  left: -70,  top: 0,   outer: false, mask: 239}
+        ];
+        
+        _.each(squares, function(atSquares) {
+            foundSuqare = findObjs({                              
+                _pageid: thisPageId,                              
+                _type: 'graphic',
+                layer: 'map',
+                width: 70,
+                height: 70,
+                left: parseInt(token.get('left')) + parseInt(atSquares.left),
+                top: parseInt(token.get('top')) + parseInt(atSquares.top),
+            });
+            foundBits = _.where(bitTiles, {
+                url: foundSuqare.length ? foundSuqare[0].get('imgsrc') : 'none',
+                degree: foundSuqare.length ? foundSuqare[0].get('rotation') : 'none'
+            });                           
+            theseTiles.push({
+                sqr: atSquares.sqr,
+                sqrMask: atSquares.mask,
+                updateId: foundSuqare.length ? foundSuqare[0].get('id') : 'none',
+                UpdateName: foundSuqare.length ? foundSuqare[0].get('name') : 'none',
+                updateRotation: foundSuqare.length ? foundSuqare[0].get('rotation') : 'none',
+                updateImgsrc: foundSuqare.length ? foundSuqare[0].get('imgsrc') : 'none',
+                updateLeft: foundSuqare.length ? (parseInt(token.get('left')) + atSquares.left) : 'none',
+                updateTop: foundSuqare.length ? (parseInt(token.get('top')) + atSquares.top) : 'none',
+                value: foundBits.length ? foundBits[0].value : 'none',
+                mask: foundBits.length ? foundBits[0].mask : 'none',
+                pack: foundBits.length ? foundBits[0].pack : 'none',
+            });
         });
-        _.each(installedTextures, function(eachTextures) {
-            args = eachTextures.split('|');
-            text += '<br><a href="!DungeonDrawSetTexture ' + args[0] + '"><span ' + spanOneStyle + '>▹ ' + args[0] + '</span></a>';
+        _.each(theseTiles, function(eachTileFlatten) {
+            if( 'none' !== eachTileFlatten.UpdateName) {
+                currentTileBits = eachTileFlatten.value & eachTileFlatten.mask;
+                seekBits = currentTileBits & eachTileFlatten.sqrMask;
+                seekPack = eachTileFlatten.pack;
+                seekDegree = eachTileFlatten.updateRotation; 
+                
+                checkTiles = _.where(bitTiles, {pack: seekPack});
+                i=0;
+                while (i < checkTiles.length) {
+                    maskedMapSquare = seekBits & checkTiles[i].mask;
+                    if(checkTiles[i].value === maskedMapSquare){
+                        getObj('graphic', eachTileFlatten.updateId).remove();
+                        changeTarget = createObj('graphic', {
+                            _type: 'graphic',
+                            subtype: 'token', 
+                            pageid: thisPageId, 
+                            layer: 'map', 
+                            width: 70, 
+                            height: 70,
+                            left: eachTileFlatten.updateLeft, 
+                            top: eachTileFlatten.updateTop,
+                            rotation: checkTiles[i].degree,
+                            imgsrc: checkTiles[i].url,
+                            name: checkTiles[i].key
+                        });
+                        setTimeout(function() {toBack(changeTarget); }, 500);
+                        break;
+                    }
+                i = i + 1;
+                }
+            }
         });
-        sendChat('Select Texture', text);
+    },
+    
+    getUnderFlatten = function(token) {
+        var squares = [],
+            foundSuqare,
+            foundBits,
+            theseTiles = [],
+            thisPageId = token.get('pageid'),
+            tile1,
+            tile2,
+            tile3,
+            tile4,
+            currentTileBits,
+            seekBits,
+            seekPack = 'none',
+            seekDegree,
+            checkTiles,
+            i,
+            maskedMapSquare,
+            changeTarget;
+            
+        bitTiles = [];
+        getAllBitTiles();
+        
+        //OR Logic
+        squares = [
+            {sqr: 1,  left: -35,  top: -35,  outer: false, mask: 28},
+            {sqr: 2,  left: +35,  top: -35,  outer: false, mask:  7},
+            {sqr: 3,  left: +35,  top: +35,  outer: false, mask: 193},
+            {sqr: 4,  left: -35,  top: +35,  outer: false, mask: 112}
+        ];
+        
+        _.each(squares, function(atSquares) {
+            foundSuqare = findObjs({                              
+                _pageid: thisPageId,                              
+                _type: 'graphic',
+                layer: 'map',
+                width: 70,
+                height: 70,
+                left: parseInt(token.get('left')) + parseInt(atSquares.left),
+                top: parseInt(token.get('top')) + parseInt(atSquares.top),
+            });
+            foundBits = _.where(bitTiles, {
+                url: foundSuqare.length ? foundSuqare[0].get('imgsrc') : 'none',
+                degree: foundSuqare.length ? foundSuqare[0].get('rotation') : 'none'
+            });                           
+            theseTiles.push({
+                sqr: atSquares.sqr,
+                sqrMask: atSquares.mask,
+                updateId: foundSuqare.length ? foundSuqare[0].get('id') : 'none',
+                UpdateName: foundSuqare.length ? foundSuqare[0].get('name') : 'none',
+                updateRotation: foundSuqare.length ? foundSuqare[0].get('rotation') : 'none',
+                updateImgsrc: foundSuqare.length ? foundSuqare[0].get('imgsrc') : 'none',
+                updateLeft: foundSuqare.length ? (parseInt(token.get('left')) + atSquares.left) : 'none',
+                updateTop: foundSuqare.length ? (parseInt(token.get('top')) + atSquares.top) : 'none',
+                value: foundBits.length ? foundBits[0].value : 'none',
+                mask: foundBits.length ? foundBits[0].mask : 'none',
+                pack: foundBits.length ? foundBits[0].pack : 'none',
+            });
+        });
+        _.each(theseTiles, function(eachTileFlatten) {
+            if( 'none' !== eachTileFlatten.UpdateName) {
+                currentTileBits = eachTileFlatten.value & eachTileFlatten.mask;
+                seekBits = currentTileBits | eachTileFlatten.sqrMask;
+                seekPack = eachTileFlatten.pack;
+                seekDegree = eachTileFlatten.updateRotation; 
+                
+                checkTiles = _.where(bitTiles, {pack: seekPack});
+                i=0;
+                while (i < checkTiles.length) {
+                    maskedMapSquare = seekBits & checkTiles[i].mask;
+                    if(checkTiles[i].value === maskedMapSquare){
+                        getObj('graphic', eachTileFlatten.updateId).remove();
+                        changeTarget = createObj('graphic', {
+                            _type: 'graphic',
+                            subtype: 'token', 
+                            pageid: thisPageId, 
+                            layer: 'map', 
+                            width: 70, 
+                            height: 70,
+                            left: eachTileFlatten.updateLeft, 
+                            top: eachTileFlatten.updateTop,
+                            rotation: checkTiles[i].degree,
+                            imgsrc: checkTiles[i].url,
+                            name: checkTiles[i].key
+                        });
+                        setTimeout(function() {toBack(changeTarget); }, 500);
+                        break;
+                    }
+                i = i + 1;
+                }
+            }
+        });
+    },
+    
+    dungeonMapperRemoveReplace = function(message) {
+        var token = getObj('graphic', message.selected[0]._id);
+        
+        if( 'flatten' === token.get('name') ) {
+            getUnderFlatten(token);
+        }else{
+            getUnderRaise(token);
+        }
+    },
+    
+    fixFlattenTool = function(obj) {
+        if( 'flatten' === obj.get('name') ) {
+            obj.set({
+                rotation: 0,
+                width: 140, 
+                height: 140,
+                left: Math.floor(obj.get('left') / 70) * 70, 
+                top: Math.floor(obj.get('top') / 70) * 70
+            });
+        }else{
+            obj.set({
+                rotation: 0,
+                width: 210, 
+                height: 210,
+                left: (Math.floor(obj.get('left') / 70) * 70) + 35, 
+                top: (Math.floor(obj.get('top') / 70) * 70) + 35
+            });
+        }
+    },
+    
+    dungeonDrawAddToolRaise = function() {
+        var pageId,
+            page,
+            center,
+            middle,
+            whichTool,
+            newTool;
+            
+        pageId = Campaign().get('playerpageid');
+        page = getObj('page', pageId);
+        center = (Math.floor(page.get('width') / 2) * 70) - 35;
+        middle = (Math.floor(page.get('height') / 2) * 70) - 35;
+        
+        newTool = createObj('graphic', {
+            type: 'graphic', 
+            subtype: 'token', 
+            pageid: pageId, 
+            layer: 'map', 
+            width: 210, 
+            height: 210,
+            left: center, 
+            top: middle, 
+            imgsrc: 'https://s3.amazonaws.com/files.d20.io/images/8908018/CX3Y6F5LJmI84N5dJP7CUg/thumb.png?1429400112',
+            represents: macrosInstall(),
+            name: 'raise'
+        });
+        setTimeout(function() {toFront(newTool); }, 500);
+    },
+    
+    dungeonDrawAddToolFlatten = function() {
+        var pageId,
+            page,
+            center,
+            middle,
+            whichTool,
+            newTool;
+            
+        pageId = Campaign().get('playerpageid');
+        page = getObj('page', pageId);
+        center = Math.floor(page.get('width') / 2) * 70;
+        middle = Math.floor(page.get('height') / 2) * 70;
+        
+        newTool = createObj('graphic', {
+            type: 'graphic', 
+            subtype: 'token', 
+            pageid: pageId, 
+            layer: 'map', 
+            width: 140, 
+            height: 140,
+            left: center, 
+            top: middle, 
+            imgsrc: 'https://s3.amazonaws.com/files.d20.io/images/8907984/mi2Vl6tWu8JsGM0LpCmYNg/thumb.png?1429400030',
+            represents: macrosInstall(),
+            name: 'flatten'
+        });
+        setTimeout(function() {toFront(newTool); }, 500);
+    },
+    
+    macrosInstall = function() {
+        var controller = findObjs({ _type: 'character', name: 'Dungeon-Draw-Connection'})[0] || 
+            createObj('character', {name: 'Dungeon-Draw-Connection', avatar: 'https://s3.amazonaws.com/files.d20.io/images/8821111/fBVwB1f2_t7U3k8XrmbKxw/thumb.png?1428953603'}),
+            ability = findObjs({_type: 'ability', name: '⇗▀⇘▄-Remove-Replace', characterid: controller.get('id')})[0] || 
+            createObj('ability', {name: '⇗▀⇘▄-Remove-Replace', characterid: controller.get('id'), action: '!DungeonMapperRemoveReplace', istokenaction: true});
+        
+        return controller.get('id');
     },
     
     colorMap = function() {
@@ -60,121 +334,6 @@ var DungeonDraw = DungeonDraw || (function(){
         if( _.isEmpty(page) ){return; }
         if( (false === /^#[0-9A-F]{6}$/.test(args[1])) && (2 !== args.length) ){return; }
         page.set('background_color', args[1]);
-    },
-    
-    dungeonDrawNumber = function (key) {
-        var page,
-            pageId,
-            thisTile,
-            center,
-            middle,
-            newObj;
-            
-        thisTile = _.where(currentTiles, {key: key});
-        if( _.isEmpty(thisTile) ) {return; }
-
-        pageId = Campaign().get('playerpageid');
-        page = getObj('page', pageId);
-        center = Math.floor(page.get('width') / 2) * 70;
-        middle = Math.floor(page.get('height') / 2) * 70;
-        
-        newObj = createObj('graphic', {
-            type: 'graphic', 
-            subtype: 'token', 
-            pageid: pageId, 
-            layer: 'map', 
-            width: 70, 
-            height: 70,
-            left: center, 
-            top: middle, 
-            imgsrc: thisTile[0].url, 
-            name: key
-        });
-        
-        setTimeout(function() {toFront(newObj); }, 500);
-        newObj.set('gmnotes', newObj.get('id'));
-    },
-    
-    dungeonDrawMenu = function() {
-        var i = 0,
-            mode = '◯-Draw-Is-<b>ON</b>',
-            tag = atagForStyle,
-            span = spanOneStyle,
-            tableText = '';
-        
-        if( false === state.DungeonDraw.drawMode ){
-            mode = '◯-Draw-Is-<b>OFF</b>';
-            tag = atagThrStyle;
-            span = spanOneStyle;
-        }
-        sendChat('Dungeon Draw Tools', ' ');
-        tableText += '<div' + tablDivStyle + '>';
-                    tableText += '<div' + trowDivStyle + '>'
-                        +'<div' + cellDivStyle + '>'
-                                +'<a href="!DungeonDrawConnection ' + DungeonDrawConnections.Connections[0].connection + '" ' + atagTwoStyle + '>'
-                                +'<img src="'  + DungeonDrawConnections.Connections[0].url
-                                +'" height="50" width="50" border="0"' + imagDivStyle + '">'
-                                +'</a>'
-                        +'</div>'
-                        +'<div' + cellDivStyle + '>'
-                                +'<a href="!TAKENOACTION" ' + atagTwoStyle + '>'
-                                +'<img src="' + 'https://s3.amazonaws.com/files.d20.io/images/8838664/r-3M8jzLatXgeb88GnKy_g/thumb.jpg?1429048748'
-                                +'" height="50" width="50" border="0"' + imagDivStyle + '">'
-                                +'</a>'
-                        +'</div>'
-                        +'<div' + cellDivStyle + '>'
-                                +'<a href="!TAKENOACTION" ' + atagTwoStyle + '>'
-                                +'<img src="' + 'https://s3.amazonaws.com/files.d20.io/images/8838664/r-3M8jzLatXgeb88GnKy_g/thumb.jpg?1429048748'
-                                +'" height="50" width="50" border="0"' + imagDivStyle + '">'
-                                +'</a>'
-                        +'</div>'
-                        +'<div' + cellDivStyle + '>'
-                                +'<a href="!TAKENOACTION" ' + atagTwoStyle + '>'
-                                +'<img src="' + 'https://s3.amazonaws.com/files.d20.io/images/8838664/r-3M8jzLatXgeb88GnKy_g/thumb.jpg?1429048748'
-                                +'" height="50" width="50" border="0"' + imagDivStyle + '">'
-                                +'</a>'
-                        +'</div>'
-                    +'</div>';
-        while (i < currentTiles.length) {
-            tableText += '<div' + trowDivStyle + '>'
-                        +'<div' + cellDivStyle + '>'
-                                +'<a href="!DungeonDrawNumber ' + currentTiles[i].key + '" ' + atagTwoStyle + '>'
-                                +'<img src="' + currentTiles[i].url
-                                +'" height="50" width="50" border="0"' + imagDivStyle + '">'
-                                +'</a>'
-                        +'</div>'
-                        +'<div' + cellDivStyle + '>'
-                                +'<a href="!DungeonDrawNumber ' + currentTiles[i + 1].key + '" ' + atagTwoStyle + '>'
-                                +'<img src="' + currentTiles[i + 1].url
-                                +'" height="50" width="50" border="0"' + imagDivStyle + '">'
-                                +'</a>'
-                        +'</div>'
-                        +'<div' + cellDivStyle + '>'
-                                +'<a href="!DungeonDrawNumber ' + currentTiles[i + 2].key + '" ' + atagTwoStyle + '>'
-                                +'<img src="' + currentTiles[i + 2].url
-                                +'" height="50" width="50" border="0"' + imagDivStyle + '">'
-                                +'</a>'
-                        +'</div>'
-                        +'<div' + cellDivStyle + '>'
-                                +'<a href="!DungeonDrawNumber ' + currentTiles[i + 3].key + '" ' + atagTwoStyle + '>'
-                                +'<img src="' + currentTiles[i + 3].url
-                                +'" height="50" width="50" border="0"' + imagDivStyle + '">'
-                                +'</a>'
-                        +'</div>'
-                    +'</div>';
-            i = i + 4;
-        }
-        tableText += '</div>';
-        sendChat("Current Tiles", tableText);
-        
-        sendChat('Main Menu', '/direct '
-            +'<br><a href="!DungeonDrawUndo"' + atagOneStyle + '><span ' + spanOneStyle + '>↻-Undo-Path</span></a>'
-            +'<br><a href="!DungeonDrawMap"' + atagOneStyle + '><span ' + spanOneStyle + '>╔╣-Dungeon-Draw</span></a>'
-            +'<br><a href="!DungeonDrawClear ?{Are You Sure|Y}"' + atagOneStyle + '><span ' + spanOneStyle + '>⊠-Clear-Map</span></a>'
-            +'<br><a href="!DungeonDrawColor"' + atagOneStyle + '><span ' + spanOneStyle + '>▓-Set-Map-Color</span></a>'
-            +'<br><a href="!DungeonDrawChange"' + atagOneStyle + '><span ' + spanOneStyle + '>⊞-Change-Texture</span></a>'
-            +'<br><a href="!DungeonDrawMode"' + tag + '><span ' + span + '>' + mode + '</span></a>'
-            );
     },
     
     dungeonDrawSetTexture = function(message) {
@@ -194,25 +353,229 @@ var DungeonDraw = DungeonDraw || (function(){
             };
             
         currentTiles = _.clone(DungeonDrawTiles[state.DungeonDraw.currentTextureName]);
-        
+        currentTextureName = state.DungeonDraw.currentTextureName;
         dungeonDrawMenu();
     },
     
-    clearMap = function(y) {
-        if( 'Y' !== y.toUpperCase() ){return; }
+    dungeonDrawChange = function() {
+        var text = '/direct ',
+            args;
         
-        _.each(findObjs({_pageid: Campaign().get('playerpageid'), _type: 'graphic', layer: 'map'}), function(obj) {    
-            getObj('graphic', obj.id).remove();
+        if( 0 === installedTextures.length) {return; }
+        
+        _.each(installedTextures, function(eachTextures) {
+            args = eachTextures.split('|');
+            if( 2 !== args.length){return; }
+        });
+        _.each(installedTextures, function(eachTextures) {
+            args = eachTextures.split('|');
+            text += '<br><a href="!DungeonDrawSetTexture ' + args[0] + '"><span  style="color: white; font-weight: normal; display: block; width: 150px;" >▹ ' + args[0] + '</span></a>';
+        });
+        sendChat('Select Texture', text);
+    },
+    
+    eigthBitClockwise = function(value, degree) {
+        var shift = (degree/90) * 2;
+        return (((value | (value << 8)) >> shift) & 255);
+    },
+    
+    getAllBitTiles = function() {
+        var newValue,
+            newMask;
+            
+        bitTiles = [];
+        
+        _.each(allTexturesTiles, function(eachTile) {
+            if( 0 !== eachTile.mask ){
+                bitTiles.push({
+                    degree: 0, 
+                    value: eachTile.value,
+                    mask: eachTile.mask,
+                    url: eachTile.url,
+                    key: eachTile.key,
+                    pack: eachTile.pack
+                });
+                newValue = eigthBitClockwise(eachTile.value, 90);
+                newMask = eigthBitClockwise(eachTile.mask, 90);
+                bitTiles.push({
+                    degree: 90, 
+                    value: newValue,
+                    mask: newMask,
+                    url: eachTile.url,
+                    key: eachTile.key,
+                    pack: eachTile.pack
+                });
+                newValue = eigthBitClockwise(eachTile.value, 180);
+                newMask = eigthBitClockwise(eachTile.mask, 180);
+                bitTiles.push({
+                    degree: 180, 
+                    value: newValue,
+                    mask: newMask,
+                    url: eachTile.url,
+                    key: eachTile.key,
+                    pack: eachTile.pack
+                });
+                newValue = eigthBitClockwise(eachTile.value, 270);
+                newMask = eigthBitClockwise(eachTile.mask, 270);
+                bitTiles.push({
+                    degree: 270, 
+                    value: newValue,
+                    mask: newMask,
+                    url: eachTile.url,
+                    key: eachTile.key,
+                    pack: eachTile.pack
+                });
+            }
+        });
+    },
+    
+    
+    deferredCreateObj = (function(){
+        var queue = [],
+            creator,
+        
+        doCreates = function(){
+            var done = 0,
+                request;
+                
+            while(queue.length && ++done < deferred.batchSize ){
+                request = queue.shift();
+                createObj(request.type,request.properties);
+            }
+            if( queue.length ){
+                creator = setTimeout(doCreates, deferred.batchDefer );
+            } else {
+            creator = false;
+            }
+        };
+        return function(type,properties){
+        queue.push({type: type, properties: properties});
+        if(!creator){
+            creator = setTimeout(doCreates, deferred.initialDefer );
+        }
+    }
+    }()),
+    
+    getBits = function(left,top,thisPageId) {
+        var i,
+            checkTiles,
+            maskedMapSquare,
+            seekBits = 0,
+            bit1 = _.isEmpty(pathToGrid[ (parseInt(left,10) - 70).toString()  + ':' + top.toString() ]) ? 0 : 1,
+            bit2 = _.isEmpty(pathToGrid[ (parseInt(left,10) - 70).toString()  + ':' + (parseInt(top,10) + 70).toString() ]) ? 0 : 2,
+            bit3 = _.isEmpty(pathToGrid[ left.toString()  + ':' + (parseInt(top,10) + 70).toString() ]) ? 0 : 4,
+            bit4 = _.isEmpty(pathToGrid[ (parseInt(left,10) + 70).toString()  + ':' + (parseInt(top,10) + 70).toString() ]) ? 0 : 8,
+            bit5 = _.isEmpty(pathToGrid[ (parseInt(left,10) + 70).toString()  + ':' + top.toString() ]) ? 0 : 16,
+            bit6 = _.isEmpty(pathToGrid[ (parseInt(left,10) + 70).toString()  + ':' + (parseInt(top,10) - 70).toString() ]) ? 0 : 32,
+            bit7 = _.isEmpty(pathToGrid[ left.toString()  + ':' + (parseInt(top,10) - 70).toString() ]) ? 0 : 64,
+            bit8 = _.isEmpty(pathToGrid[ (parseInt(left,10) - 70).toString()  + ':' + (parseInt(top,10) - 70).toString() ]) ? 0 : 128;
+            
+        seekBits = bit1 | bit2 | bit3 | bit4 | bit5 | bit6 | bit7 | bit8;
+        
+        checkTiles = _.where(bitTiles, {pack: currentTextureName});
+        
+        i=0;
+        while (i < checkTiles.length) {
+            maskedMapSquare = seekBits & checkTiles[i].mask;
+            if(checkTiles[i].value === maskedMapSquare){
+                deferredCreateObj('graphic', {
+                    subtype: 'token', 
+                    pageid: thisPageId, 
+                    layer: 'map', 
+                    width: 70, 
+                    height: 70,
+                    left: left, 
+                    top: top,
+                    rotation: checkTiles[i].degree,
+                    imgsrc: checkTiles[i].url,
+                    name: checkTiles[i].key
+                });
+                break;
+            }
+            i = i + 1;
+        }
+    },
+    
+    getGridFromPaths = function(id,pageid,left,top,width,height) {
+        var leftMostLeft = left - (width / 2) + 35,
+            topMostTop = top - (height / 2) + 35,
+            gridWidth = width / 70,
+            gridHeight = height / 70,
+            stepRight = 0,
+            stepDown = 0;
+            
+        while (stepDown < gridHeight) {
+            stepRight = 0;
+            while (stepRight < gridWidth) {
+                if(_.isEmpty(placedToGrid[ (leftMostLeft + (stepRight * 70)) + ':' + (topMostTop + (stepDown * 70)) ])){
+                    pathToGrid[ (leftMostLeft + (stepRight * 70)) + ':' + (topMostTop + (stepDown * 70)) ] = {
+                        left: (leftMostLeft + (stepRight * 70)),
+                        top: (topMostTop + (stepDown * 70)),
+                        pageid: pageid
+                    };    
+                }
+                stepRight = stepRight + 1;
+            }
+            stepDown = stepDown + 1;
+        }    
+    },
+    
+    dungeonDrawMap = function() {
+        var drawPaths = _.clone(undoPaths),
+            left_top,
+            thisPageId = Campaign().get('playerpageid'),
+            existTiles;
+            
+        undoPaths = [];
+        
+        existTiles = filterObjs(function(obj) {
+            switch(obj.get('name')) {
+                case 'DD_001':
+                case 'DD_002':
+                case 'DD_003':
+                case 'DD_004':
+                case 'DD_005':
+                case 'DD_006':
+                case 'DD_007':
+                case 'DD_008':
+                case 'DD_009':
+                case 'DD_010':
+                case 'DD_012':
+                case 'DD_013':
+                case 'DD_014':
+                case 'DD_015':
+                case 'DD_016':
+                    if(thisPageId === obj.get('pageid')){
+                       return true;  
+                    }
+            }   
+            return false;
         });
         
-        _.each(findObjs({_pageid: Campaign().get('playerpageid'),  _type: 'path', layer: 'map'}), function(obj) {    
+        placedToGrid = [];
+        _.each(existTiles, function(eachTile) {
+            placedToGrid[eachTile.get('left').toString() + ':' + eachTile.get('top').toString()] = {id: eachTile.get('id')};
+        });
+        
+        _.each(drawPaths, function(eachPath) {
+            getGridFromPaths(eachPath.id,eachPath.pageid,eachPath.left,eachPath.top,eachPath.width,eachPath.height)
+        });
+        
+        Object.keys(pathToGrid).forEach(function(key) {
+            left_top = key.split(':');
+            
+            getBits(left_top[0],left_top[1],thisPageId);
+        });
+        
+        pathToGrid = [];
+        
+        _.each(findObjs({_pageid: thisPageId,  _type: 'path', layer: 'map'}), function(obj) {    
             getObj('path', obj.id).remove();
         });
         
-        undo = [];
-        placedTiles = [];
+        undoPaths = [];
     },
-    
+
     pathingRotation = function(angle, point,width,height) {
         var pointX = point[0], pointY = point[1], originX = (width/2), originY = (height/2);
         angle = angle * Math.PI / 180.0;
@@ -297,313 +660,7 @@ var DungeonDraw = DungeonDraw || (function(){
         });  
     },
     
-    createTile = function(pageid, degree, url, topTile, leftTile, key) {
-        var newObj = createObj('graphic', {
-            type: 'graphic', 
-            subtype: 'token', 
-            pageid: pageid, 
-            layer: 'map',
-            width: 70,
-            height: 70,
-            left: leftTile, 
-            top: topTile, 
-            imgsrc: url,
-            rotation: degree,
-            name: key
-        });
-        
-        placedTiles.push({
-            id: newObj.get('id'),
-            pageid: pageid,
-            key: key,
-            left: leftTile,
-            top: topTile
-        });
-    },
-
-    eigthBitClockwise = function(value, degree) {
-        var shift = (degree/90) * 2;
-        return (((value | (value << 8)) >> shift) & 255);
-    },
-    
-    placeTiles = function(pageid) {
-        var bitTiles = [],
-            newValue,
-            newMask,
-            maskedMapSquare,
-            i;
-            
-        _.each(currentTiles, function(eachTile) {
-            if( 0 !== eachTile.value ){
-                bitTiles.push({
-                    degree: 0, 
-                    value: eachTile.value,
-                    mask: eachTile.mask,
-                    url: eachTile.url,
-                    key: eachTile.key
-                });
-            }
-            newValue = eigthBitClockwise(eachTile.value, 90);
-            newMask = eigthBitClockwise(eachTile.mask, 90);
-            bitTiles.push({
-                degree: 90, 
-                value: newValue,
-                mask: newMask,
-                url: eachTile.url,
-                key: eachTile.key
-            });
-            newValue = eigthBitClockwise(eachTile.value, 180);
-            newMask = eigthBitClockwise(eachTile.mask, 180);
-            bitTiles.push({
-                degree: 180, 
-                value: newValue,
-                mask: newMask,
-                url: eachTile.url,
-                key: eachTile.key
-            });
-            newValue = eigthBitClockwise(eachTile.value, 270);
-            newMask = eigthBitClockwise(eachTile.mask, 270);
-            bitTiles.push({
-                degree: 270, 
-                value: newValue,
-                mask: newMask,
-                url: eachTile.url,
-                key: eachTile.key
-            });
-        }); 
-
-        _.each(tileSidePattern, function(eachTile) {
-            i=0;
-            while (i < bitTiles.length) {
-                maskedMapSquare = parseInt( eachTile.mapBits, 2 ) & bitTiles[i].mask;
-                if(bitTiles[i].value === maskedMapSquare){
-                    createTile(pageid, bitTiles[i].degree, bitTiles[i].url, eachTile.topTile, eachTile.leftTile, bitTiles[i].key);
-                    break;
-                }
-                i = i + 1;
-            }
-            
-        });
-    },
-    
-    findTileSidePattern = function(pageWidth,pageHeight) {
-        var rowCount,
-            columnCount,
-            mapBits; 
-        
-        tileSidePattern = [];
-        for (rowCount = 0; rowCount < (pageHeight + 2); rowCount = rowCount + 1) {
-            for (columnCount = 0; columnCount < (pageWidth + 2); columnCount = columnCount + 1) {
-                if( (0 !== rowCount) && (0 !== columnCount) && (pageHeight >= rowCount) && (pageWidth >= columnCount) ) {
-                    if( '1' === paddedAsciiMap[rowCount][columnCount]) {
-                        mapBits = paddedAsciiMap[rowCount - 1][columnCount - 1];
-                        mapBits += paddedAsciiMap[rowCount - 1][columnCount];
-                        mapBits +=  paddedAsciiMap[rowCount - 1][columnCount + 1];
-                        mapBits += paddedAsciiMap[rowCount][columnCount + 1];
-                        mapBits += paddedAsciiMap[rowCount + 1 ][columnCount + 1];
-                        mapBits += paddedAsciiMap[rowCount + 1][columnCount];
-                        mapBits += paddedAsciiMap[rowCount + 1][columnCount - 1];
-                        mapBits += paddedAsciiMap[rowCount][columnCount - 1];
-                        
-                        tileSidePattern.push({
-                            topTile: ((rowCount - 1) * 70) + 35,
-                            leftTile: ((columnCount - 1) * 70) + 35,
-                            mapBits: mapBits
-                        });
-                    }
-                }
-            }
-        } 
-    },
-        
-    findFill = function(path) {
-        var rowCount,
-            columnCount,
-            pageHeight = path.pageHeight,
-            pageWidth = path.pageWidth,
-            leftMostLeft = (path.pathLeft - (path.width/2)) / 70,
-            topMostTop = (path.pathTop - (path.height/2)) / 70,
-            width = path.width / 70,
-            height = path.height / 70,
-            currentPath,
-            checkTop,
-            CheckLeft,
-            check = [];
-        
-        //Flag tiles
-        for (rowCount = 0; rowCount < height; rowCount = rowCount + 1) {
-            for (columnCount = 0; columnCount < width; columnCount = columnCount + 1) {
-                asciiMap[topMostTop + rowCount][leftMostLeft + columnCount] = "1";
-            }
-        }
-        
-        //Pad Edges
-        paddedAsciiMap = [];
-        for (rowCount = 0; rowCount < (pageHeight + 2); rowCount = rowCount + 1) {
-            paddedAsciiMap[rowCount] = [];
-            for (columnCount = 0; columnCount < (pageWidth + 2); columnCount = columnCount + 1) {
-                if( 0 === rowCount || (pageHeight + 1) === rowCount || 0 === columnCount || (pageWidth + 1) === columnCount ){
-                    paddedAsciiMap[rowCount][columnCount] = '0';
-                }else{
-                    checkTop = ((rowCount - 1) * 70) + 35;
-                    CheckLeft = ((columnCount - 1) * 70) + 35;
-                    check = _.where(placedTiles, {left: CheckLeft, top: checkTop});
-                    if( 0 === check.length) {
-                        paddedAsciiMap[rowCount][columnCount] = asciiMap[(rowCount - 1)][(columnCount - 1)];
-                    }else{
-                        paddedAsciiMap[rowCount][columnCount] = '0';    
-                    }
-                }
-            }
-        }
-        
-        currentPath = getObj('path', path.id);
-        currentPath.remove();
-    },
-  
-    dungeonDrawMap = function() {
-        var copyPaths, 
-        pageid,
-        page,
-        pageWidth, 
-        pageHeight,
-        sortedPaths = [], 
-        thePath,
-        rowCount,
-        columnCount;
-        
-        if( 0 === undo.length ){return; }
-        copyPaths = _.clone(undo); 
-        
-        pageid =  Campaign().get('playerpageid');
-        page = getObj('page', pageid);
-        pageWidth =  page.get('width');
-        pageHeight =  page.get('height');
-        
-        asciiMap = [];
-        for (rowCount = 0; rowCount < pageHeight; rowCount = rowCount + 1) {
-            asciiMap[rowCount] = [];
-            for (columnCount = 0; columnCount < pageWidth; columnCount = columnCount + 1) {
-                asciiMap[rowCount][columnCount] = '0';
-            }
-        }
-
-        _.each(copyPaths, function(eachPath) {
-            thePath = getObj('path', eachPath);
-            sortedPaths.push({
-                id: eachPath,
-                area: (thePath.get('width')/70) * (thePath.get('height')/70),
-                pathLeft: thePath.get('left'),
-                pathTop: thePath.get('top'),
-                width: thePath.get('width'),
-                height: thePath.get('height'),
-                pageWidth: pageWidth,
-                pageHeight: pageHeight
-                });
-        });
-        sortedPaths = _.sortBy(sortedPaths, 'area');
-        sortedPaths.reverse();
-        _.each(sortedPaths, function(eachPath) {
-            findFill(eachPath);
-        });
-        
-        findTileSidePattern(pageWidth,pageHeight);
-        placeTiles(pageid);
-    },
- 
-    dungeonDrawUndo = function() {
-        var obj;
-        
-        if( 0 === undo.length ){return; }
-        obj = getObj('path', undo.pop());
-        obj.remove(); 
-    },
-    
-    checkInstall = function() {
-        Object.keys(DungeonDrawTiles).forEach(function(key) {
-            installedTextures.push(key);
-        });
-        if( ! _.has(state,'DungeonDraw') || state.DungeonDraw.version !== schemaVersion) {
-            log('DungeonDraw: Resetting state');
-            state.DungeonDraw = {
-                version: schemaVersion,
-                currentTextureName: defaultTexture,
-                drawMode: true
-            };
-        }
-        currentTiles = _.clone(DungeonDrawTiles[state.DungeonDraw.currentTextureName]);
-        sendChat('Main Menu', '<a href="!DungeonDrawMenu"' + atagOneStyle + '><span ' + spanOneStyle + '>Dungeon Draw Menu</span></a>');
-    },
-    
-    handleGraphicDestroy = function(obj) {
-        var foundTiles = _.where(currentTiles, {key: obj.get('name')}),
-            placedTiles = _.reject(placedTiles,function(o){
-                return obj.get('id') === o.id;
-            });
-        
-        if( 0 === foundTiles.length) {return; }
-        if ( (255 === foundTiles[0].value) && (0 === foundTiles[0].mask) ){return; }
-        
-        _.each(findObjs({_type: 'path', controlledby: obj.get('_id') }), function(eachPath) {
-            eachPath.remove();
-        });
-    },
-    
-    handleGraphicChange = function(obj) {
-        var ObjValues,
-            foundTiles,
-            bitCount,
-            featurePathArray,
-            pathValue;
-            
-        ObjValues = _.reduce(['name','pageid','rotation','left','top','flipv','fliph','id'],function(m,prop){
-            m[prop] = obj.get(prop);
-            return m;
-        }, {});
-        
-        foundTiles = _.where(currentTiles, {key: ObjValues.name});
-        if( 0 === foundTiles.length) {return; }
-        if ( (255 === foundTiles[0].value) && (0 === foundTiles[0].mask) ){return; }
-        
-        _.each( findObjs({_type: 'path', controlledby: ObjValues.id}), function(eachPath) {
-            eachPath.remove();
-        });
-        
-        featurePathArray = [];
-        for (bitCount = 0; bitCount < 8; bitCount = bitCount + 1) {
-            if (!(foundTiles[0].value & (1<<bitCount))) {
-                switch(bitCount + 1) {
-                    case 1: pathValue = [[0,-1],[0,71]];  break;
-                    case 2: pathValue = [[0,68],[0,70],[2,70]]; break;
-                    case 3: pathValue = [[-1,70],[71,70]]; break;
-                    case 4: pathValue = [[70,68],[70,70],[68,70]]; break;
-                    case 5: pathValue = [[70,-1],[70,71]]; break;
-                    case 6: pathValue = [[70,2],[70,0],[68,0]]; break;
-                    case 7: pathValue = [[-1,0],[71,0]]; break;
-                    case 8: pathValue = [[0,2],[0,0],[2,0]]; break;
-                }
-                if(pathValue){
-                    featurePathArray.push({
-                        width: 70,
-                        height: 70,
-                        top: ObjValues.top,
-                        left: ObjValues.left,
-                        rotation: ObjValues.rotation,
-                        fliph: ObjValues.fliph,
-                        flipv: ObjValues.flipv,
-                        path: pathValue,
-                        stroke: '#FF0000',
-                        strokewidth: 3,
-                        forID: ObjValues.id
-                    });
-                }
-            }
-        }
-        placeRotatedFlipPaths(featurePathArray);
-        setTimeout(function() {toFront(obj); }, 500);
-    },
-    
-    getCenter = function(xy, wh) {
+    getMapCenter = function(xy, wh) {
         var center = (Math.round((xy - (wh / 2))/35) * 35) / 70;
         
         center = center - Math.floor(center);
@@ -612,42 +669,253 @@ var DungeonDraw = DungeonDraw || (function(){
         } 
         return xy;
     },
-   
-    handlePathAdd = function(obj) {
-        if( false === state.DungeonDraw.drawMode ){return; }
-        var ObjValues,             
-            createdPath;
+    
+    dungeonDrawNumber = function (key) {
+        var page,
+            pageId,
+            thisTile,
+            center,
+            middle,
+            keyArguments,
+            newObj,
+            width = 70, 
+            height = 70;
             
-        ObjValues = _.reduce(['layer','pageid','stroke','left','top','width','height'],function(m,prop){
+        pageId = Campaign().get('playerpageid');
+        page = getObj('page', pageId);
+        center = page.get('width') * 35;
+        middle = page.get('height') * 35;
+        
+        thisTile = _.where(currentTiles, {key: key});
+        if( _.isEmpty(thisTile) ) {
+            keyArguments = key.split('_');
+            if(-1 !== 'GM,Label,Level'.indexOf(keyArguments[0])){
+                thisTile = _.where(gmSpecial, {key: key});
+                newObj = createObj('graphic', {
+                    type: 'graphic', 
+                    subtype: 'token', 
+                    pageid: pageId, 
+                    layer: 'map', 
+                    width: 70, 
+                    height: 70,
+                    left: center, 
+                    top: middle, 
+                    imgsrc: thisTile[0].url,
+                    name: key
+                });
+                
+            setTimeout(function() {toFront(newObj); }, 500);
+            }
+            return; 
+        }
+        if ( (255 === thisTile[0].value) && (0 === thisTile[0].mask) ){
+            width = 140;
+            height = 140;
+            }
+        
+        newObj = createObj('graphic', {
+            type: 'graphic', 
+            subtype: 'token', 
+            pageid: pageId, 
+            layer: 'map', 
+            width: width, 
+            height: height,
+            left: getMapCenter((Math.ceil(center/35) * 35), (Math.ceil(width/70) * 70)),
+            top: getMapCenter((Math.ceil(middle/35) * 35), (Math.ceil(height/70) * 70)),
+            imgsrc: thisTile[0].url, 
+            name: key
+        });
+        newObj.set('gmnotes', newObj.get('id'));
+    },
+    
+    clearMap = function(y) {
+        if( 'Y' !== y.toUpperCase() ){return; }
+        
+        _.each(findObjs({_pageid: Campaign().get('playerpageid'), _type: 'graphic', layer: 'map'}), function(obj) {    
+            getObj('graphic', obj.id).remove();
+        });
+        
+        _.each(findObjs({_pageid: Campaign().get('playerpageid'),  _type: 'path', layer: 'map'}), function(obj) {    
+            getObj('path', obj.id).remove();
+        });
+        
+        undoPaths = [];
+    },
+    
+    dungeonDrawUndo = function() {
+        var lastPathSequence,
+            undoThisPathId,
+            undoThisPath;
+            
+        if( _.isEmpty(undoPaths) ){
+            return;
+        }
+        lastPathSequence = Math.max.apply(Math,undoPaths.map(function(o){return o.sequence;}));
+        undoThisPath = _.where(undoPaths, {sequence: lastPathSequence});
+        undoPaths = _.reject(undoPaths,function(o){
+                    return undoThisPath[0].id === o.id;
+                });  
+        undoThisPath = getObj('path', undoThisPath[0].id).remove();
+    },
+    
+    dungeonDrawMenu = function() {
+        var i = 0,
+            tableText = DungeonDrawDirect['TopMenu'],
+            menuText = '/direct ';
+            
+        sendChat('Dungeon Draw Tools', ' ');
+        while (i < currentTiles.length) {
+            tableText += DungeonDrawDirect['RowMenu'];
+            tableText += DungeonDrawDirect['CellMenu'];
+            tableText += '<a href="!DungeonDrawNumber ' + currentTiles[i].key + '" ' + DungeonDrawDirect['ButtonMenu'] + '>';
+            tableText += '<img src="' + currentTiles[i].url
+                                +'" height="50" width="50" border="0"' + DungeonDrawDirect['ImageMenu'] + '">'
+                                +'</a>'
+                        +'</div>';
+            tableText += DungeonDrawDirect['CellMenu'];
+            tableText += '<a href="!DungeonDrawNumber ' + currentTiles[i + 1].key + '" ' + DungeonDrawDirect['ButtonMenu'] + '>';
+            tableText += '<img src="' + currentTiles[i + 1].url
+                                +'" height="50" width="50" border="0"' + DungeonDrawDirect['ImageMenu'] + '">'
+                                +'</a>'
+                        +'</div>';
+            tableText += DungeonDrawDirect['CellMenu'];
+            tableText += '<a href="!DungeonDrawNumber ' + currentTiles[i + 2].key + '" ' + DungeonDrawDirect['ButtonMenu'] + '>';
+            tableText += '<img src="' + currentTiles[i + 2].url
+                                +'" height="50" width="50" border="0"' + DungeonDrawDirect['ImageMenu'] + '">'
+                                +'</a>'
+                        +'</div>';
+            tableText += DungeonDrawDirect['CellMenu'];
+            tableText += '<a href="!DungeonDrawNumber ' + currentTiles[i + 3].key + '" ' + DungeonDrawDirect['ButtonMenu'] + '>';
+            tableText += '<img src="' + currentTiles[i + 3].url
+                                +'" height="50" width="50" border="0"' + DungeonDrawDirect['ImageMenu'] + '">'
+                                +'</a>'
+                        +'</div>';
+            tableText += '</div>';
+            i = i + 4;
+        }
+        tableText += '</div>';
+        sendChat("Current Tiles", '/direct ' + tableText);
+        menuText += DungeonDrawDirect['!DungeonDrawUndo'];
+        menuText += DungeonDrawDirect['!DungeonDrawClear'];
+        menuText += DungeonDrawDirect['!DungeonDrawMap'];
+        menuText += DungeonDrawDirect['!DungeonDrawColor']; 
+        menuText += DungeonDrawDirect['!DungeonDrawChange'];
+        if( true === state.DungeonDraw.drawMode ){
+            menuText += DungeonDrawDirect['DungeonDrawModeTrue'];
+        }else{
+            menuText += DungeonDrawDirect['DungeonDrawModeFalse'];
+        }
+        sendChat('Main Menu', menuText);
+    },
+    
+    getObjValue = function(obj, keys) {
+        return _.reduce( keys || objExtractKeys, function(m,prop){
             m[prop] = obj.get(prop);
             return m;
         }, {});
+    },
+    
+    createSnappedPath = function(obj) {
+        var ObjValues = getObjValue(obj),
+            createdObject;
         
-        if( 'map' !== ObjValues.layer ){return; }
-        obj.remove(); 
+        if( 'map' !== ObjValues.layer ){
+            return; 
+        }
         
-        createdPath = createObj('path',{ 
+        obj.remove();
+        if( (70 > (Math.ceil(ObjValues.width/70) * 70)) || (70 > (Math.ceil(ObjValues.height/70) * 70)) ) {
+            return;
+        }
+        
+        createdObject = createObj('path',{ 
             pageid: ObjValues.pageid, 
             layer: ObjValues.layer, 
             path: '[["M",0,0],["L",' + (Math.ceil(ObjValues.width/70) * 70) + ',0],["L",' + (Math.ceil(ObjValues.width/70) * 70) + ',' + (Math.ceil(ObjValues.height/70) * 70) + '],["L",0,' + (Math.ceil(ObjValues.height/70) * 70) + '],["L",0,0]]',
-            left: getCenter((Math.ceil(ObjValues.left/35) * 35), (Math.ceil(ObjValues.width/70) * 70)),
-            top: getCenter((Math.ceil(ObjValues.top/35) * 35), (Math.ceil(ObjValues.height/70) * 70)),
+            left: getMapCenter((Math.ceil(ObjValues.left/35) * 35), (Math.ceil(ObjValues.width/70) * 70)),
+            top: getMapCenter((Math.ceil(ObjValues.top/35) * 35), (Math.ceil(ObjValues.height/70) * 70)),
             width: (Math.ceil(ObjValues.width/70) * 70), 
             height: (Math.ceil(ObjValues.height/70) * 70), 
+            fill: '#00C957', 
+            stroke:'#00C957',
+            stroke_width: 1,
+            controlledby: 'DungeonDrawPath'
+        });
+        
+        undoPaths.push({
+            id: createdObject.get('id'),
+            pageid: ObjValues.pageid, 
+            layer: ObjValues.layer,
+            path: createdObject.get('path'),
+            left: createdObject.get('left'),
+            top: createdObject.get('top'),
+            width: createdObject.get('width'),
+            height: createdObject.get('height'),
             fill: ObjValues.stroke,
             stroke: ObjValues.stroke,
             stroke_width: 1,
-            controlledby: 'DungeonDraw'
+            controlledby: 'DungeonDraw',
+            sequence: seq()
         });
         
-        undo.push(createdPath.get('id'));
-        setTimeout(function() {toBack(createdPath); }, 500);
+        setTimeout(function() {toBack(createdObject); }, 600);
     },
     
-    handlePathDestroy = function(obj) {
-        undo = _.without(undo, obj.get('id'));
+    //~~~~~~~~~~~~~~~~~~~~~OnReady or Page Bookmark Move~~~~~~~~~~~~~~~
+    refreshData = function(){
+        var i,
+            tempPack;
+            
+        currentTiles = _.clone(DungeonDrawTiles[state.DungeonDraw.currentTextureName]);
+        currentTextureName = state.DungeonDraw.currentTextureName;
+        
+        allTexturesTiles = [];
+        for (i = 0; i < installedTextures.length; i++) {
+            tempPack = _.clone(DungeonDrawTiles[installedTextures[i]]);
+            _.each(tempPack, function(eachTile) {
+                allTexturesTiles.push({
+                    url: eachTile.url,
+                    key: eachTile.key,
+                    value: eachTile.value,
+                    mask: eachTile.mask,
+                    pack: installedTextures[i]
+                });
+            });
+        }
+        
+        currentPageId = Campaign().get('playerpageid');
+        
+        getAllBitTiles();
+        
+        _.each(findObjs({_type: 'path', controlledby: 'DungeonDrawPath'}), function(eachPath) {
+            getObj('path', eachPath.id).remove();
+        });
     },
     
+    checkInstall = function() {
+        var i,
+            tempPack;
+        
+        Object.keys(DungeonDrawTiles).forEach(function(key) {
+            installedTextures.push(key);
+        });
+        
+        if( ! _.has(state,'DungeonDraw') || state.DungeonDraw.version !== schemaVersion) {
+            log('DungeonDraw: Resetting state');
+            state.DungeonDraw = {
+                version: schemaVersion,
+                currentTextureName: defaultTexture,
+                drawMode: true
+            };
+        }
+        
+        refreshData();
+        macrosInstall();
+        
+        sendChat('Main Menu', '/direct ' + DungeonDrawDirect['!DungeonDrawMenu']);
+    },
+    
+    // Event Handlers~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     handleInput = function(msg) {
         var message = _.clone(msg), messageArguments;
         
@@ -668,27 +936,161 @@ var DungeonDraw = DungeonDraw || (function(){
         dungeonDrawProcessing = true;
         
         switch(messageArguments[0]) { 
-            case '!DungeonDrawUndo': dungeonDrawUndo(); break;  
-            case '!DungeonDrawMap': dungeonDrawMap(); break;   
-            case '!DungeonDrawClear': clearMap(messageArguments[1]); break;  
+            case '!DungeonDrawUndo': dungeonDrawUndo(); break;    
+            case '!DungeonDrawClear': clearMap(messageArguments[1]); break;
+            case '!DungeonDrawMap': dungeonDrawMap(); break;
             case '!DungeonDrawColor': colorMap();  break; 
             case '!DungeonDrawNumber': dungeonDrawNumber(messageArguments[1]); break;  
             case '!DungeonDrawChange': dungeonDrawChange(); break;  
             case '!DungeonDrawSetTexture': dungeonDrawSetTexture(message.content); break;
+            case '!DungeonDrawAddToolFlatten': dungeonDrawAddToolFlatten(); break;
+            case '!DungeonDrawAddToolRaise': dungeonDrawAddToolRaise(); break;
+            case '!DungeonMapperRemoveReplace': dungeonMapperRemoveReplace(message); break;
+            //case '!DungeonDrawGmMenu': dungeonDrawGmMenu(); break;
         }
         dungeonDrawProcessing = false;
     },
     
-    handlePageChange = function(obj) {
-        undo = [];
-        placedTiles = [];
+    handleGraphicAdd = function(obj) {
+        
     },
- 
+    
+    handleGraphicChange = function(obj) {
+        var ObjValues = getObjValue(obj,['name','pageid','rotation','left','top','flipv','fliph','id','imgsrc']),
+            foundTile = _.where(allTexturesTiles, {url: ObjValues.imgsrc}),
+            featurePathArray,
+            bitCount,
+            pathValue,
+            newRotation,
+            newLeft,
+            newTop,
+            findOtherTiles;
+        
+        if( !_.isEmpty(foundTile) ){
+            if ( (255 === foundTile[0].value) && (0 === foundTile[0].mask) ){
+                return; 
+            }
+            newLeft = (Math.round((ObjValues.left - 35)/70)*70) + 35;
+            newTop = (Math.round((ObjValues.top - 35)/70)*70) + 35;
+            newRotation = (Math.round(ObjValues.rotation/90)*90)%360 + (ObjValues.rotation<0 ? 360 : 0);
+            obj.set({
+                rotation: newRotation,
+                flipv: false,
+                fliph: false,
+                width: 70,
+                height: 70,
+                top: newTop,
+                left: newLeft
+            });
+            _.each( findObjs({_type: 'path', controlledby: ObjValues.id}), function(eachPath) {
+                eachPath.remove();
+            });
+            featurePathArray = [];
+            for (bitCount = 0; bitCount < 8; bitCount = bitCount + 1) {
+                if (!(foundTile[0].value & (1<<bitCount))) {
+                    switch(bitCount + 1) {
+                        case 1: pathValue = [[0,-1],[0,71]];  break;
+                        case 2: pathValue = [[0,68],[0,70],[2,70]]; break;
+                        case 3: pathValue = [[-1,70],[71,70]]; break;
+                        case 4: pathValue = [[70,68],[70,70],[68,70]]; break;
+                        case 5: pathValue = [[70,-1],[70,71]]; break;
+                        case 6: pathValue = [[70,2],[70,0],[68,0]]; break;
+                        case 7: pathValue = [[-1,0],[71,0]]; break;
+                        case 8: pathValue = [[0,2],[0,0],[2,0]]; break;
+                    }
+                    if(pathValue){
+                        featurePathArray.push({
+                            width: 70,
+                            height: 70,
+                            top: newTop,
+                            left: newLeft,
+                            rotation: newRotation,
+                            fliph: false,
+                            flipv: false,
+                            path: pathValue,
+                            stroke: '#FF0000',
+                            strokewidth: 3,
+                            forID: ObjValues.id
+                        });
+                    }
+                }
+            }
+            placeRotatedFlipPaths(featurePathArray);
+            setTimeout(function() {toFront(obj); }, 500);
+        }
+        if( ('flatten' === ObjValues.name) || ('raise' === ObjValues.name) ) {
+            fixFlattenTool(obj);
+        }
+    },
+    
+    handleGraphicDestroy = function(obj) {
+        var foundTiles = _.where(currentTiles, {key: obj.get('name')});
+        
+        if( 0 === foundTiles.length) {return; }
+        if ( (255 === foundTiles[0].value) && (0 === foundTiles[0].mask) ){
+            return; 
+        }
+        
+        _.each(findObjs({_type: 'path', controlledby: obj.get('_id') }), function(eachPath) {
+            eachPath.remove();
+        });
+    },
+    
+    handlePathAdd = function(obj) {
+        if( false === state.DungeonDraw.drawMode ) {
+            return; 
+        }
+        if( obj.get('_pageid') !== Campaign().get("playerpageid") ) {
+            return; 
+        }
+        createSnappedPath(obj);
+    },
+    
+    handlePathChange = function(obj) {
+        var ObjValues = getObjValue(obj),
+            thesePath = _.where(undoPaths, {id: ObjValues.id}),
+            changedPath;
+            
+            _.each(thesePath, function(eachPath) {
+                changedPath = getObj('path', eachPath.id);
+                changedPath.set({
+                    layer: eachPath.layer,
+                    left: eachPath.left,
+                    top: eachPath.top,
+                    width: eachPath.width,
+                    height: eachPath.height,
+                    fill: '#00C957',
+                    stroke: '#00C957',
+                    stroke_width: 1
+                });
+            });
+            setTimeout(function() {toBack(obj); }, 500);
+    },
+    
+    handlePathDestroy = function(obj) {
+        var ObjValues = getObjValue(obj),
+            thesePath = _.where(undoPaths, {id: ObjValues.id});
+            
+            _.each(thesePath, function(eachPath) {
+                undoPaths = _.reject(undoPaths,function(o){
+                    return eachPath.id === o.id;
+                });    
+            });
+    },
+    
+    handlePageChange = function(obj) {
+        if ( Campaign().get('playerpageid') !== currentPageId ) {
+            refreshData();
+        }
+    }, 
+    
     registerEventHandlers = function() {
         on('chat:message', handleInput);
+        //on('add:graphic', handleGraphicAdd);
         on('change:graphic', handleGraphicChange);
         on('destroy:graphic', handleGraphicDestroy);
         on('add:path', handlePathAdd);
+        on('change:path', handlePathChange);
         on('destroy:path', handlePathDestroy);
         on('change:campaign:playerpageid', handlePageChange);
         checkInstall();
@@ -703,3 +1105,55 @@ on('ready',function(){
     'use strict';
     DungeonDraw.RegisterEventHandlers();
 });
+
+var DungeonDrawDirect = (function () {
+    'use strict';
+    var direct = [],
+    
+    buttonType01_atag = ' style="border: 1px solid AliceBlue; background-color: SteelBlue; color: white;" ',
+    buttonType01_span = ' style="color: white; font-weight: normal; display: block; width: 150px;" ';
+
+    direct['!DungeonDrawMenu'] = ' <a href="!DungeonDrawMenu"' + buttonType01_atag + ' ><span' + buttonType01_span + '>Dungeon Draw Menu</span></a>';
+    
+    direct['TopMenu'] = '<div style="display: table;" >'
+                    + '<div style="display: table-row;" >'
+                        +'<div style="display: table-cell; border-collapse: collapse; padding-left: 0px; padding-right: 0px;" >'
+                                +'<a href="!DungeonDrawAddToolFlatten" style="border: 1px solid Black; background-color: White; color: white;" >'
+                                +'<img src="' + 'https://s3.amazonaws.com/files.d20.io/images/8907984/mi2Vl6tWu8JsGM0LpCmYNg/thumb.png?1429400030'
+                                +'" height="50" width="50" border="0" style="padding: 0px 0px 0px 0px; outline: none; border: none;" >'
+                                +'</a>'
+                        +'</div>'
+                        +'<div style="display: table-cell; border-collapse: collapse; padding-left: 0px; padding-right: 0px;" >'
+                                +'<a href="!DungeonDrawAddToolRaise" style="border: 1px solid Black; background-color: White; color: white;" >'
+                                +'<img src="' + 'https://s3.amazonaws.com/files.d20.io/images/8908018/CX3Y6F5LJmI84N5dJP7CUg/thumb.png?1429400112'
+                                +'" height="50" width="50" border="0" style="padding: 0px 0px 0px 0px; outline: none; border: none;" >'
+                                +'</a>'
+                        +'</div>'
+                        +'<div style="display: table-cell; border-collapse: collapse; padding-left: 0px; padding-right: 0px;" >'
+                                +'<a href="!TAKENOACTION" style="border: 1px solid Black; background-color: White; color: white;" >'
+                                +'<img src="' + 'https://s3.amazonaws.com/files.d20.io/images/8838664/r-3M8jzLatXgeb88GnKy_g/thumb.jpg?1429048748'
+                                +'" height="50" width="50" border="0" style="padding: 0px 0px 0px 0px; outline: none; border: none;" >'
+                                +'</a>'
+                        +'</div>'
+                        +'<div style="display: table-cell; border-collapse: collapse; padding-left: 0px; padding-right: 0px;" >'
+                                +'<a href="!TAKENOACTION" style="border: 1px solid Black; background-color: White; color: white;" >'
+                                +'<img src="' + 'https://s3.amazonaws.com/files.d20.io/images/8838664/r-3M8jzLatXgeb88GnKy_g/thumb.jpg?1429048748'
+                                +'" height="50" width="50" border="0" style="padding: 0px 0px 0px 0px; outline: none; border: none;" >'
+                                +'</a>'
+                        +'</div>'
+                    +'</div>';
+                    
+    direct['RowMenu'] = '<div style="display: table-row;" >';
+    direct['CellMenu'] = '<div style="display: table-cell; border-collapse: collapse; padding-left: 0px; padding-right: 0px;" >';
+    direct['ButtonMenu'] = ' style="border: 1px solid Black; background-color: White; color: white;" ';
+    direct['ImageMenu'] = ' style="padding: 0px 0px 0px 0px; outline: none; border: none;" ';
+    direct['!DungeonDrawUndo'] = '<br><a href="!DungeonDrawUndo"' + buttonType01_atag + ' ><span' + buttonType01_span + '>↻-Undo-Path</span></a>';
+    direct['!DungeonDrawMap'] = '<br><a href="!DungeonDrawMap"' + buttonType01_atag + ' ><span' + buttonType01_span + '>╔╣-Dungeon-Draw</span></a>';
+    direct['!DungeonDrawClear'] = '<br><a href="!DungeonDrawClear ?{Are You Sure|Y}"' + buttonType01_atag + ' ><span' + buttonType01_span + '>⊠-Clear-Map</span></a>';
+    direct['!DungeonDrawColor'] = '<br><a href="!DungeonDrawColor"' + buttonType01_atag + ' ><span' + buttonType01_span + '>▓-Set-Map-Color</span></a>';
+    direct['!DungeonDrawChange'] = '<br><a href="!DungeonDrawChange"' + buttonType01_atag + ' ><span' + buttonType01_span + '>⊞-Change-Texture</span></a>';
+    direct['DungeonDrawModeFalse'] = '<br><a href="!DungeonDrawMode" style="border: 1px solid DarkGray; background-color: DarkGray; color: white;" ><span style="color: white; font-weight: normal; display: block; width: 150px;" >◯-Draw-Is-<b>OFF</b></span>'; 
+    direct['DungeonDrawModeTrue'] = '<br><a href="!DungeonDrawMode" style="border: 1px solid Black; background-color: PaleGreen; color: Black;" ><span style="color: white; font-weight: normal; display: block; width: 150px;" >◯-Draw-Is-<b>ON</b></span>';  
+    
+    return direct;
+}());
