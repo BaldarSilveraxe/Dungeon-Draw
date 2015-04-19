@@ -1,8 +1,8 @@
 var DungeonDoors = DungeonDoors || (function(){
     'use strict';
-    //version = 0.5
-    //lastUpdate = 1428930444 //Unix timestamp
-    //schemaVersion = 0.5
+    //version = 1.0
+    //lastUpdate = 1429442387 //Unix timestamp
+    //schemaVersion = 1.0
     
     var defaultTexture = 'Old School|#18769c',
     
@@ -485,4 +485,3 @@ on('ready',function(){
     'use strict';
     DungeonDoors.RegisterEventHandlers();
 });
-
