@@ -1,10 +1,14 @@
-var DungeonDoors = DungeonDoors || (function(){
+var DungeonDrawDoors = DungeonDrawDoors || (function(){
     'use strict';
-    //version = 1.0
-    //lastUpdate = 1429442387 //Unix timestamp
-    //schemaVersion = 1.0
+    //version = 2.0
+    //lastUpdate = 1430236079 //Unix timestamp
+    //schemaVersion = 2.0
     
-    var defaultTexture = 'Old School|#18769c',
+    var defaultTexture = 'Stone Floor Dungeon|#43472A',
+    
+    //light settings
+    light_radius_setting = 30,
+    light_dimradius_setting = 10,
     
     toggleIcon = 'https://s3.amazonaws.com/files.d20.io/images/8434850/ijzdctgdJpFj_Q2NC9GFvg/thumb.png?1427221316',
     
@@ -52,24 +56,6 @@ var DungeonDoors = DungeonDoors || (function(){
         pack = _.where(currentTiles, {pack: packName});
         
         switch(name) {
-            case 'DD_017':
-            case 'DD_018':
-                a = _.where(pack, {key: 'DD_017'})[0].url;
-                b = _.where(pack, {key: 'DD_018'})[0].url;
-                token.set({
-                    imgsrc: (token.get('imgsrc') === a ? b : a),
-                    name: (token.get('name') === 'DD_017' ? 'DD_018' : 'DD_017')
-                    });
-            break;
-            case 'DD_019':
-            case 'DD_020':
-                a = _.where(pack, {key: 'DD_019'})[0].url;
-                b = _.where(pack, {key: 'DD_020'})[0].url;
-                token.set({
-                    imgsrc: (token.get('imgsrc') === a ? b : a),
-                    name: (token.get('name') === 'DD_019' ? 'DD_020' : 'DD_019')
-                    });
-            break;
             case 'DD_021':
             case 'DD_022':
                 a = _.where(pack, {key: 'DD_021'})[0].url;
@@ -88,6 +74,15 @@ var DungeonDoors = DungeonDoors || (function(){
                     name: (token.get('name') === 'DD_023' ? 'DD_024' : 'DD_023')
                     });
             break;
+            case 'DD_025':
+            case 'DD_026':
+                a = _.where(pack, {key: 'DD_025'})[0].url;
+                b = _.where(pack, {key: 'DD_026'})[0].url;
+                token.set({
+                    imgsrc: (token.get('imgsrc') === a ? b : a),
+                    name: (token.get('name') === 'DD_025' ? 'DD_026' : 'DD_025')
+                    });
+            break;
             case 'DD_027':
             case 'DD_028':
                 a = _.where(pack, {key: 'DD_027'})[0].url;
@@ -95,6 +90,15 @@ var DungeonDoors = DungeonDoors || (function(){
                 token.set({
                     imgsrc: (token.get('imgsrc') === a ? b : a),
                     name: (token.get('name') === 'DD_027' ? 'DD_028' : 'DD_027')
+                    });
+            break;
+            case 'DD_029':
+            case 'DD_030':
+                a = _.where(pack, {key: 'DD_029'})[0].url;
+                b = _.where(pack, {key: 'DD_030'})[0].url;
+                token.set({
+                    imgsrc: (token.get('imgsrc') === a ? b : a),
+                    name: (token.get('name') === 'DD_029' ? 'DD_030' : 'DD_029')
                     });
             break;
         }
@@ -254,8 +258,8 @@ var DungeonDoors = DungeonDoors || (function(){
         }
         
         switch(ObjValues.name) {
-            case 'DD_025':
-            case 'DD_026':
+            case 'DD_031':
+            case 'DD_032':
                 //stairs
                 obj.set({
                     width: 140,
@@ -275,8 +279,8 @@ var DungeonDoors = DungeonDoors || (function(){
                     forID: ObjValues.id
                 });
             break;
-            case 'DD_027':
-            case 'DD_028':
+            case 'DD_029':
+            case 'DD_030':
                 //bars
                 obj.set({
                     width: 140,
@@ -285,34 +289,34 @@ var DungeonDoors = DungeonDoors || (function(){
                     represents: findObjs({ _type: 'character', name: 'Door-And-Torch-Control'})[0].get('_id')
                 });
             break;
-            case 'DD_021':
-            case 'DD_023':
+            case 'DD_025':
+            case 'DD_027':
                 //light sources ON
                 obj.set({
                     width: 140,
                     height: 140,
-                    light_radius: 60,
-                    light_dimradius: 20,
+                    light_radius: light_radius_setting,
+                    light_dimradius: light_dimradius_setting,
                     light_otherplayers: true,
                     layer: 'objects',
                     represents: findObjs({ _type: 'character', name: 'Door-And-Torch-Control'})[0].get('_id')
                 });
             break;
-            case 'DD_022':
-            case 'DD_024':
+            case 'DD_026':
+            case 'DD_028':
                 //lights OFF
                 obj.set({
                     width: 140,
                     height: 140,
                     light_radius: 0,
-                    light_dimradius: 20,
+                    light_dimradius: light_dimradius_setting,
                     light_otherplayers: true,
                     layer: 'objects',
                     represents: findObjs({ _type: 'character', name: 'Door-And-Torch-Control'})[0].get('_id')
                 });
             break;
-            case 'DD_017':
-            case 'DD_018':
+            case 'DD_021':
+            case 'DD_022':
                 obj.set({
                     width: 140,
                     height: 140,
@@ -328,13 +332,13 @@ var DungeonDoors = DungeonDoors || (function(){
                     rotation: ObjValues.rotation,
                     fliph: ObjValues.fliph,
                     flipv: ObjValues.flipv,
-                    path: [[60,65],[141,65],[141,70]],
+                    path: [[75,65],[141,65],[141,70]],
                     stroke: '#FF0000',
                     strokewidth: 3,
                     forID: ObjValues.id
                 });
                 
-                if( 'DD_017' === ObjValues.name ) {
+                if( 'DD_021' === ObjValues.name ) {
                     //Door Open
                     featurePathArray.push({
                         width: 140,
@@ -344,7 +348,7 @@ var DungeonDoors = DungeonDoors || (function(){
                         rotation: ObjValues.rotation,
                         fliph: ObjValues.fliph,
                         flipv: ObjValues.flipv,
-                        path: [[60,65],[55,70],[60,120]],
+                        path: [[75,65],[65,75],[75,125]],
                         stroke: '#FF0000',
                         strokewidth: 3,
                         forID: ObjValues.id
@@ -359,22 +363,22 @@ var DungeonDoors = DungeonDoors || (function(){
                         rotation: ObjValues.rotation,
                         fliph: ObjValues.fliph,
                         flipv: ObjValues.flipv,
-                        path: [[0,70],[0,65],[60,65]],
+                        path: [[0,70],[0,65],[76,65]],
                         stroke: '#FF0000',
                         strokewidth: 3,
                         forID: ObjValues.id
                     });
                 }
             break;  
-            case 'DD_019':
-            case 'DD_020':
+            case 'DD_023':
+            case 'DD_024':
                 obj.set({
                     width: 140,
                     height: 140,
                     layer: 'objects',
                     represents: findObjs({ _type: 'character', name: 'Door-And-Torch-Control'})[0].get('_id')
                 });
-                if( 'DD_019' === ObjValues.name) {
+                if( 'DD_023' === ObjValues.name) {
                     featurePathArray.push({
                         width: 140,
                         height: 140,
@@ -483,5 +487,5 @@ var DungeonDoors = DungeonDoors || (function(){
 
 on('ready',function(){
     'use strict';
-    DungeonDoors.RegisterEventHandlers();
+    DungeonDrawDoors.RegisterEventHandlers();
 });
