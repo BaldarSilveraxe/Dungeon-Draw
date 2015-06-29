@@ -61,7 +61,6 @@ var DungeonDraw = DungeonDraw || (function(){
             loadPage = getObj('page', loadPageId); 
             switch(mapData.schemaVersion){
                 case 1:
-                    log(mapData)
                     loadPage.set('width', mapData.width);
                     loadPage.set('height', mapData.height);
                     loadPage.set('background_color', mapData.background_color);
