@@ -1,10 +1,10 @@
 var DungeonDrawDoors = DungeonDrawDoors || (function(){
     'use strict';
-    //version = 2.0
+    //version = 3.1
     //lastUpdate = 1430236079 //Unix timestamp
-    //schemaVersion = 2.0
+    //schemaVersion = 3.1
     
-    var defaultTexture = 'Stone Floor Dungeon|#43472A',
+    var defaultTexture = 'Old School|#18769c',
     
     //light settings
     light_radius_setting = 30,
@@ -172,7 +172,7 @@ var DungeonDrawDoors = DungeonDrawDoors || (function(){
             given.left = objectLeft;
             given.top = objectTop;
             createObj('path',{ 
-                pageid: Campaign().get('playerpageid'), 
+                pageid: given.page, 
                 layer: 'walls', 
                 path: given.path,
                 left: given.left,
@@ -276,7 +276,8 @@ var DungeonDrawDoors = DungeonDrawDoors || (function(){
                     path: [[0,141],[0,0],[140,0],[140,141]],
                     stroke: '#FF0000',
                     strokewidth: 3,
-                    forID: ObjValues.id
+                    forID: ObjValues.id,
+                    page: ObjValues.pageid
                 });
             break;
             case 'DD_029':
@@ -335,7 +336,8 @@ var DungeonDrawDoors = DungeonDrawDoors || (function(){
                     path: [[75,65],[141,65],[141,70]],
                     stroke: '#FF0000',
                     strokewidth: 3,
-                    forID: ObjValues.id
+                    forID: ObjValues.id,
+                    page: ObjValues.pageid
                 });
                 
                 if( 'DD_021' === ObjValues.name ) {
@@ -351,7 +353,8 @@ var DungeonDrawDoors = DungeonDrawDoors || (function(){
                         path: [[75,65],[65,75],[75,125]],
                         stroke: '#FF0000',
                         strokewidth: 3,
-                        forID: ObjValues.id
+                        forID: ObjValues.id,
+                        page: ObjValues.pageid
                     });
                 }else{
                     //DoorClosed
@@ -366,7 +369,8 @@ var DungeonDrawDoors = DungeonDrawDoors || (function(){
                         path: [[0,70],[0,65],[76,65]],
                         stroke: '#FF0000',
                         strokewidth: 3,
-                        forID: ObjValues.id
+                        forID: ObjValues.id,
+                        page: ObjValues.pageid
                     });
                 }
             break;  
@@ -390,7 +394,8 @@ var DungeonDrawDoors = DungeonDrawDoors || (function(){
                         path: [[140,70],[140,65],[125,65],[115,128]],
                         stroke: '#FF0000',
                         strokewidth: 3,
-                        forID: ObjValues.id
+                        forID: ObjValues.id,
+                        page: ObjValues.pageid
                     });  
                     featurePathArray.push({
                         width: 140,
@@ -403,7 +408,8 @@ var DungeonDrawDoors = DungeonDrawDoors || (function(){
                         path: [[0,70],[0,65],[15,65],[25,128]],
                         stroke: '#FF0000',
                         strokewidth: 3,
-                        forID: ObjValues.id
+                        forID: ObjValues.id,
+                        page: ObjValues.pageid
                     });
                 }else{    
                     featurePathArray.push({
@@ -417,7 +423,8 @@ var DungeonDrawDoors = DungeonDrawDoors || (function(){
                         path: [[0,70],[0,65],[140,65],[140,70]],
                         stroke: '#FF0000',
                         strokewidth: 3,
-                        forID: ObjValues.id
+                        forID: ObjValues.id,
+                        page: ObjValues.pageid
                     });
                 }
             break;
